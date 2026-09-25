@@ -15,6 +15,7 @@ import {
 import { downloadBackup, lastBackupAt } from '../lib/backup'
 import { formatTimestamp } from '../lib/dates'
 import { CATEGORY_COLORS, ICON_GROUPS } from '../lib/icons'
+import { amountToInput, parseAmount } from '../lib/money'
 import type { Category, CategoryType } from '../lib/types'
 
 /** ยืนยันลบหมวด ถ้ามีรายการใช้อยู่ให้เลือกว่าจะย้ายไปหมวดไหน */
@@ -110,6 +111,7 @@ function CategoryForm({
   const [iconName, setIconName] = useState(category?.iconName ?? (category ? '' : type === 'income' ? 'Coins' : 'Package'))
   const [emoji, setEmoji] = useState(category?.iconName ? '' : category?.icon ?? '')
   const [color, setColor] = useState(category?.color ?? CATEGORY_COLORS[0])
+  const [budget, setBudget] = useState(category?.budget ? amountToInput(category.budget) : '')
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -117,9 +119,19 @@ function CategoryForm({
 
   async function submit(e: FormEvent) {
     e.preventDefault()
+    const budgetSatang = budget.trim() === '' ? undefined : parseAmount(budget)
+    if (budgetSatang === null || (budgetSatang !== undefined && budgetSatang < 0)) {
+      return setError('งบประมาณต้องเป็นตัวเลข เช่น 6000')
+    }
     setSaving(true)
     try {
-      const input = { name, icon: emoji.trim() || '📦', iconName: iconName || undefined, color }
+      const input = {
+        name,
+        icon: emoji.trim() || '📦',
+        iconName: iconName || undefined,
+        color,
+        budget: type === 'expense' ? budgetSatang || undefined : undefined,
+      }
       if (category) await updateCategory(category.id, input)
       else await addCategory({ ...input, type })
       toast(category ? 'แก้ไขหมวดแล้ว' : 'เพิ่มหมวดแล้ว')
@@ -186,6 +198,23 @@ function CategoryForm({
             ))}
           </div>
         </fieldset>
+
+        {type === 'expense' && (
+          <div>
+            <label className="label" htmlFor="c-budget">
+              งบต่อเดือน (บาท) <span className="font-normal text-muted">(ไม่บังคับ)</span>
+            </label>
+            <input
+              id="c-budget"
+              className="field num"
+              inputMode="decimal"
+              value={budget}
+              onChange={(e) => setBudget(e.target.value)}
+              placeholder="เช่น 6000"
+            />
+            <p className="mt-1.5 text-xs text-muted">ตั้งแล้วหน้าภาพรวมจะบอกว่าเดือนนี้ใช้ไปเท่าไหร่ และเหลือใช้ได้วันละเท่าไหร่</p>
+          </div>
+        )}
 
         <fieldset>
           <legend className="label">ไอคอน</legend>

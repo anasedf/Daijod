@@ -38,6 +38,7 @@ export interface Category {
   icon: string // อีโมจิ (ใช้เมื่อไม่มี iconName)
   iconName?: string // ชื่อไอคอนจากชุดใน lib/icons.ts
   color?: string
+  budget?: number // งบต่อเดือน (สตางค์) ใช้กับหมวดรายจ่าย
 }
 
 export type TransactionInput = Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>

@@ -174,11 +174,20 @@ export async function addCategory(input: Omit<Category, 'id'>, d: DaijodDB = db)
 
 export async function updateCategory(
   id: string,
-  input: Pick<Category, 'name' | 'icon' | 'iconName' | 'color'>,
+  input: Pick<Category, 'name' | 'icon' | 'iconName' | 'color' | 'budget'>,
   d: DaijodDB = db,
 ) {
   if (!input.name.trim()) throw new UserError('กรุณาตั้งชื่อหมวด')
-  await d.categories.update(id, { name: input.name.trim(), icon: input.icon, iconName: input.iconName, color: input.color })
+  if (input.budget !== undefined && (!Number.isSafeInteger(input.budget) || input.budget < 0)) {
+    throw new UserError('งบประมาณต้องเป็นตัวเลขไม่ติดลบ')
+  }
+  await d.categories.update(id, {
+    name: input.name.trim(),
+    icon: input.icon,
+    iconName: input.iconName,
+    color: input.color,
+    budget: input.budget || undefined,
+  })
 }
 
 /** จำนวนรายการที่ใช้หมวดนี้ */

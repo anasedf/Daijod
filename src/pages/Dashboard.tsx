@@ -8,11 +8,87 @@ import { CategoryIcon, EmptyState, errorMessage, PageHeader, useToast, WalletIco
 import type { AppData } from '../hooks/useData'
 import { formatDateLong, todayISO, toISODate, type DateRange } from '../lib/dates'
 import { backupReminder, downloadBackup, snoozeBackupReminder } from '../lib/backup'
+import { budgetSummary } from '../lib/budget'
 import { addTransaction, db } from '../lib/db'
 import { expenseByCategory, filterTransactions, sortNewestFirst, summarize } from '../lib/ledger'
 import { formatBaht } from '../lib/money'
 import { suggestQuickAdds, type QuickAdd } from '../lib/quick'
 import type { Transaction } from '../lib/types'
+
+/** งบประมาณของเดือนปัจจุบัน: ใช้ไปกี่ % เหลือเท่าไหร่ ควรใช้วันละเท่าไหร่ */
+function BudgetCard({ data, onNavigate }: { data: AppData; onNavigate: (tab: Tab) => void }) {
+  const summary = useMemo(() => budgetSummary(data.categories, data.transactions, todayISO()), [data])
+  const hasExpenseCats = data.categories.some((c) => c.type === 'expense')
+  if (summary.items.length === 0) {
+    if (!hasExpenseCats) return null
+    return (
+      <section className="card flex flex-col lg:col-span-5">
+        <CardHeader title="งบประมาณเดือนนี้" />
+        <div className="px-5 pb-5 text-sm text-ink-2">
+          ยังไม่ได้ตั้งงบ ไปที่ตั้งค่า → แตะหมวดรายจ่าย → ใส่ “งบต่อเดือน” แล้วที่นี่จะบอกว่าใช้ไปเท่าไหร่ เหลือใช้ได้วันละเท่าไหร่
+          <div className="mt-3">
+            <button className="btn-secondary min-h-9 px-3 text-sm" onClick={() => onNavigate('settings')}>
+              ตั้งงบประมาณ
+            </button>
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  const totalRatio = summary.totalBudget ? summary.totalSpent / summary.totalBudget : 0
+  const totalLeft = summary.totalBudget - summary.totalSpent
+  return (
+    <section className="card lg:col-span-5">
+      <CardHeader
+        title="งบประมาณเดือนนี้"
+        subtitle={`เหลืออีก ${summary.daysLeft} วัน · ${totalLeft >= 0 ? `เหลือ ${formatBaht(totalLeft)}` : `เกินงบ ${formatBaht(-totalLeft)}`}`}
+      />
+      <div className="px-5 pb-5">
+        <div className="mb-4">
+          <div className="flex justify-between text-sm">
+            <span className="font-medium">รวมทุกหมวด</span>
+            <span className="num">
+              {formatBaht(summary.totalSpent)} <span className="text-muted">/ {formatBaht(summary.totalBudget)}</span>
+            </span>
+          </div>
+          <BudgetBar ratio={totalRatio} />
+        </div>
+        <ul className="space-y-3.5">
+          {summary.items.map((b) => (
+            <li key={b.category.id}>
+              <div className="flex items-center justify-between gap-3 text-sm">
+                <span className="flex min-w-0 items-center gap-2">
+                  <CategoryIcon category={b.category} size="sm" />
+                  <span className="truncate">{b.category.name}</span>
+                </span>
+                <span className={`num shrink-0 ${b.remaining < 0 ? 'font-semibold text-expense' : ''}`}>
+                  {b.remaining < 0 ? `เกิน ${formatBaht(-b.remaining)}` : `เหลือ ${formatBaht(b.remaining)}`}
+                </span>
+              </div>
+              <BudgetBar ratio={b.ratio} />
+              <div className="mt-1 flex justify-between text-xs text-muted">
+                <span className="num">
+                  {formatBaht(b.spent)} / {formatBaht(b.budget)} ({Math.round(b.ratio * 100)}%)
+                </span>
+                {b.perDay !== null && <span className="num">ใช้ได้วันละ {formatBaht(b.perDay)}</span>}
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  )
+}
+
+function BudgetBar({ ratio }: { ratio: number }) {
+  const tone = ratio >= 1 ? 'bg-expense' : ratio >= 0.8 ? 'bg-amber-500' : 'bg-chart'
+  return (
+    <div className="mt-1.5 h-2 rounded-full bg-chart-track" aria-hidden>
+      <div className={`h-2 rounded-full ${tone}`} style={{ width: `${Math.min(100, Math.max(1.5, ratio * 100))}%` }} />
+    </div>
+  )
+}
 
 /** แถบเตือนให้สำรองข้อมูล เมื่อไม่เคยสำรองหรือสำรองนานแล้ว */
 function BackupBanner({ data }: { data: AppData }) {
@@ -326,6 +402,9 @@ export function DashboardPage({
             )}
           </div>
         </section>
+
+        {/* งบประมาณเดือนนี้ */}
+        <BudgetCard data={data} onNavigate={onNavigate} />
 
         {/* รายการล่าสุด */}
         <section className="card overflow-hidden lg:col-span-7">
