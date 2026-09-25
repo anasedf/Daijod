@@ -38,6 +38,7 @@ export function normalizeTransaction(input: TransactionInput): TransactionInput 
   if (input.type !== 'transfer' && input.categoryId) out.categoryId = input.categoryId
   if (input.type !== 'income') out.sourceWalletId = input.sourceWalletId
   if (input.type !== 'expense') out.destinationWalletId = input.destinationWalletId
+  if (input.importKey) out.importKey = input.importKey
   return out
 }
 

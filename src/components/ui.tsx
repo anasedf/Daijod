@@ -19,13 +19,14 @@ export function Sheet({
   onClose,
   children,
   footer,
-  wide = false,
+  size = 'md',
 }: {
   title: string
   onClose: () => void
   children: ReactNode
   footer?: ReactNode
-  wide?: boolean
+  /** ความกว้างบนจอใหญ่ (มือถือเต็มจอเสมอ) */
+  size?: 'md' | 'lg' | 'xl'
 }) {
   const panel = useRef<HTMLDivElement>(null)
   // เก็บ onClose ใน ref เพื่อให้ effect ทำงานครั้งเดียวตอนเปิด (ไม่แย่งโฟกัสระหว่างพิมพ์)
@@ -56,7 +57,7 @@ export function Sheet({
         aria-modal="true"
         aria-label={title}
         className={`anim-sheet sm:anim-pop relative flex max-h-[94dvh] w-full flex-col overflow-hidden rounded-t-3xl bg-surface shadow-2xl outline-none sm:max-h-[88dvh] sm:rounded-2xl ${
-          wide ? 'sm:max-w-xl' : 'sm:max-w-md'
+          size === 'xl' ? 'sm:max-w-4xl' : size === 'lg' ? 'sm:max-w-xl' : 'sm:max-w-md'
         }`}
       >
         <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-line sm:hidden" aria-hidden />

@@ -24,6 +24,7 @@ export interface Transaction {
   note: string
   sourceWalletId?: string // รายจ่าย และ โอน
   destinationWalletId?: string // รายรับ และ โอน
+  importKey?: string // รหัสรายการจาก statement ที่นำเข้า ใช้กันนำเข้าซ้ำ
   createdAt: number
   updatedAt: number
 }

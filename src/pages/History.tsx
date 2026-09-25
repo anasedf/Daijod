@@ -1,5 +1,6 @@
-import { ReceiptText, Search, SearchX, X } from 'lucide-react'
+import { FileUp, ReceiptText, Search, SearchX, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
+import { ImportSheet } from '../components/ImportSheet'
 import { defaultRange, RangePicker, resolveRange } from '../components/RangePicker'
 import { TransactionList } from '../components/TransactionList'
 import { EmptyState, PageHeader } from '../components/ui'
@@ -15,6 +16,7 @@ export function HistoryPage({ data, onOpen }: { data: AppData; onOpen: (t: Trans
   const [walletId, setWalletId] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [search, setSearch] = useState('')
+  const [importing, setImporting] = useState(false)
 
   const results = useMemo(
     () =>
@@ -45,8 +47,18 @@ export function HistoryPage({ data, onOpen }: { data: AppData; onOpen: (t: Trans
       <PageHeader
         title="รายการ"
         subtitle={`ทั้งหมด ${data.transactions.length} รายการ`}
-        actions={<RangePicker value={range} onChange={setRange} showAll className="w-full sm:w-auto sm:justify-end" />}
+        actions={
+          <>
+            {data.wallets.length > 0 && (
+              <button type="button" className="btn-secondary order-last sm:order-first" onClick={() => setImporting(true)}>
+                <FileUp size={18} aria-hidden /> นำเข้า statement
+              </button>
+            )}
+            <RangePicker value={range} onChange={setRange} showAll className="w-full sm:w-auto sm:justify-end" />
+          </>
+        }
       />
+      {importing && <ImportSheet data={data} onClose={() => setImporting(false)} />}
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-start lg:gap-5">
         <div className="min-w-0 space-y-4">

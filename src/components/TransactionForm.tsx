@@ -156,7 +156,7 @@ export function TransactionForm({
     <Sheet
       title={transaction ? 'แก้ไขรายการ' : 'จดรายการ'}
       onClose={onClose}
-      wide
+      size="lg"
       footer={
         <div className="flex gap-3">
           {transaction && (

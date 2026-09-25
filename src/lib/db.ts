@@ -115,6 +115,29 @@ export async function deleteTransaction(id: string, d: DaijodDB = db) {
   await d.transactions.delete(id)
 }
 
+/** เพิ่มหลายรายการในครั้งเดียว (จาก statement) ถ้ามีรายการใดผิดหรือซ้ำ จะไม่บันทึกเลยสักรายการ */
+export async function importTransactions(inputs: TransactionInput[], d: DaijodDB = db): Promise<number> {
+  const cleans = inputs.map(normalizeTransaction)
+  const now = Date.now()
+  await d.transaction('rw', d.wallets, d.transactions, async () => {
+    const ids = new Set((await d.wallets.toCollection().primaryKeys()) as string[])
+    for (const c of cleans) {
+      const errors = validateTransaction(c, ids)
+      if (errors.length) throw new UserError(errors.join('\n'))
+    }
+    const keys = new Set(cleans.map((c) => c.importKey).filter((k): k is string => !!k))
+    if (keys.size) {
+      const dup = await d.transactions.filter((t) => !!t.importKey && keys.has(t.importKey)).count()
+      if (dup) throw new UserError(`มี ${dup} รายการที่นำเข้าไปแล้ว กรุณาโหลดหน้าใหม่แล้วลองอีกครั้ง`)
+    }
+    // ใช้ createdAt ไล่ตามลำดับใน statement เพื่อให้รายการวันเดียวกันเรียงถูก
+    await d.transactions.bulkAdd(
+      cleans.map((c, i) => ({ ...c, id: newId(), createdAt: now + i, updatedAt: now + i })),
+    )
+  })
+  return cleans.length
+}
+
 // ---------- หมวดหมู่ ----------
 
 export async function addCategory(input: Omit<Category, 'id'>, d: DaijodDB = db) {

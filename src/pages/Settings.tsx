@@ -1,5 +1,6 @@
-import { Download, HardDrive, Plus, Upload } from 'lucide-react'
+import { Download, FileUp, HardDrive, Plus, Upload } from 'lucide-react'
 import { useRef, useState, type FormEvent } from 'react'
+import { ImportSheet } from '../components/ImportSheet'
 import { errorMessage, FormError, PageHeader, Sheet, useConfirm, useToast } from '../components/ui'
 import type { AppData } from '../hooks/useData'
 import { addCategory, deleteCategory, exportBackup, importBackup, updateCategory } from '../lib/db'
@@ -113,6 +114,7 @@ export function SettingsPage({ data }: { data: AppData }) {
   const confirm = useConfirm()
   const fileInput = useRef<HTMLInputElement>(null)
   const [editing, setEditing] = useState<{ type: CategoryType; category?: Category } | null>(null)
+  const [importing, setImporting] = useState(false)
 
   async function exportFile() {
     try {
@@ -197,7 +199,23 @@ export function SettingsPage({ data }: { data: AppData }) {
           })}
         </div>
 
-        <section className="card p-5 lg:sticky lg:top-8">
+        <div className="space-y-4 lg:sticky lg:top-8 lg:space-y-5">
+        <section className="card p-5">
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-soft text-brand" aria-hidden>
+              <FileUp size={20} />
+            </span>
+            <h2 className="card-title">นำเข้าจาก statement</h2>
+          </div>
+          <p className="mt-3 text-sm text-ink-2">
+            อ่านรายการจากไฟล์ statement ของธนาคาร (ตอนนี้รองรับกสิกรไทย) แล้วตรวจก่อนบันทึก ไฟล์ถูกอ่านในเครื่องนี้เท่านั้น
+          </p>
+          <button className="btn-secondary mt-4 w-full" onClick={() => setImporting(true)} disabled={data.wallets.length === 0}>
+            <FileUp size={18} aria-hidden /> เลือกไฟล์ statement
+          </button>
+        </section>
+
+        <section className="card p-5">
           <div className="flex items-center gap-3">
             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-soft text-brand" aria-hidden>
               <HardDrive size={20} />
@@ -238,9 +256,11 @@ export function SettingsPage({ data }: { data: AppData }) {
             }}
           />
         </section>
+        </div>
       </div>
 
       {editing && <CategoryForm type={editing.type} category={editing.category} onClose={() => setEditing(null)} />}
+      {importing && <ImportSheet data={data} onClose={() => setImporting(false)} />}
     </>
   )
 }

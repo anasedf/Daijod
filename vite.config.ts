@@ -12,8 +12,8 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg', 'apple-touch-icon.png', 'favicon-64.png'],
-      // เก็บฟอนต์ไว้ด้วย ให้หน้าตาเหมือนเดิมตอนออฟไลน์
-      workbox: { globPatterns: ['**/*.{js,css,html,woff2}'] },
+      // เก็บฟอนต์และ pdf.js worker (.mjs) ไว้ด้วย ให้ใช้งานและนำเข้า statement ได้ตอนออฟไลน์
+      workbox: { globPatterns: ['**/*.{js,mjs,css,html,woff2}'] },
       manifest: {
         name: 'ได้จด — จดรายรับรายจ่าย',
         short_name: 'ได้จด',
