@@ -4,6 +4,7 @@ import { formatDateShort, toISODate, type DateRange } from '../lib/dates'
 import type { CategoryTotal } from '../lib/ledger'
 import { formatBaht } from '../lib/money'
 import type { Transaction } from '../lib/types'
+import { CategoryIcon } from './ui'
 
 function parseISO(iso: string) {
   const [y, m, d] = iso.split('-').map(Number)
@@ -123,10 +124,10 @@ export function CategoryBars({ totals, total, data }: { totals: CategoryTotal[];
   const LIMIT = 6
   const rows = totals.slice(0, LIMIT).map((c) => {
     const cat = c.categoryId ? data.categoryMap.get(c.categoryId) : undefined
-    return { key: c.categoryId ?? 'none', icon: cat?.icon ?? '❔', name: cat?.name ?? 'ไม่ระบุหมวด', amount: c.amount }
+    return { key: c.categoryId ?? 'none', cat, icon: '❔', name: cat?.name ?? 'ไม่ระบุหมวด', amount: c.amount }
   })
   const rest = totals.slice(LIMIT).reduce((s, c) => s + c.amount, 0)
-  if (rest > 0) rows.push({ key: 'rest', icon: '⋯', name: `หมวดอื่น (${totals.length - LIMIT})`, amount: rest })
+  if (rest > 0) rows.push({ key: 'rest', cat: undefined, icon: '⋯', name: `หมวดอื่น (${totals.length - LIMIT})`, amount: rest })
   const max = rows[0]?.amount ?? 0
 
   return (
@@ -137,7 +138,7 @@ export function CategoryBars({ totals, total, data }: { totals: CategoryTotal[];
           <li key={r.key} title={`${r.name}: ${formatBaht(r.amount)} (${pct}%)`}>
             <div className="flex items-baseline justify-between gap-3 text-sm">
               <span className="flex min-w-0 items-center gap-2">
-                <span aria-hidden>{r.icon}</span>
+                <CategoryIcon category={r.cat} size="sm" fallback={r.icon} />
                 <span className="truncate">{r.name}</span>
               </span>
               <span className="num shrink-0 font-medium">

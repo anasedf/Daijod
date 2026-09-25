@@ -200,10 +200,34 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean
   }
 }
 
+/** filter ให้ไอคอนดูเหมือนวาดมือ: บิดเส้นเล็กน้อย + เส้นซ้อนบาง ๆ เยื้องออกไป (ใช้ผ่าน svg.lucide ใน index.css) */
+function DoodleFilter() {
+  return (
+    <svg width="0" height="0" className="absolute" aria-hidden>
+      <filter id="doodle" x="-20%" y="-20%" width="140%" height="140%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.07" numOctaves="2" seed="4" result="n" />
+        <feDisplacementMap in="SourceGraphic" in2="n" scale="1.6" xChannelSelector="R" yChannelSelector="G" result="main" />
+        <feTurbulence type="fractalNoise" baseFrequency="0.09" numOctaves="2" seed="11" result="n2" />
+        <feDisplacementMap in="SourceGraphic" in2="n2" scale="2.2" xChannelSelector="R" yChannelSelector="G" result="ghost0" />
+        <feMorphology in="ghost0" operator="erode" radius="0.7" result="ghost1" />
+        <feOffset in="ghost1" dx="1.2" dy="1.2" result="ghost" />
+        <feComponentTransfer in="ghost" result="ghostFaded">
+          <feFuncA type="linear" slope="0.5" />
+        </feComponentTransfer>
+        <feMerge>
+          <feMergeNode in="ghostFaded" />
+          <feMergeNode in="main" />
+        </feMerge>
+      </filter>
+    </svg>
+  )
+}
+
 export default function App() {
   return (
     <ErrorBoundary>
       <UIProvider>
+        <DoodleFilter />
         <Shell />
       </UIProvider>
     </ErrorBoundary>

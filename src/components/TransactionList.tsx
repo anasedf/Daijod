@@ -3,18 +3,36 @@ import { dayHeading } from '../lib/dates'
 import { TX_META } from '../lib/labels'
 import { formatBaht } from '../lib/money'
 import type { Transaction } from '../lib/types'
+import { CategoryIcon } from './ui'
 
 export function TxIcon({ tx, data }: { tx: Transaction; data: AppData }) {
   const meta = TX_META[tx.type]
-  const cat = tx.categoryId ? data.categoryMap.get(tx.categoryId) : undefined
+  const cat = tx.type !== 'transfer' && tx.categoryId ? data.categoryMap.get(tx.categoryId) : undefined
+  if (cat) return <CategoryIcon category={cat} />
   return (
-    <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg ${meta.soft}`} aria-hidden>
-      {tx.type !== 'transfer' && cat ? cat.icon : <meta.Icon size={18} className={meta.text} strokeWidth={2.2} />}
+    <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${meta.soft}`} aria-hidden>
+      <meta.Icon size={18} className={meta.text} />
     </span>
   )
 }
 
-function TransactionRow({ tx, data, onOpen }: { tx: Transaction; data: AppData; onOpen: (t: Transaction) => void }) {
+/** โหมดเลือกหลายรายการ (เช่น เพื่อลบ) */
+export interface Selection {
+  selected: Set<string>
+  toggle: (id: string) => void
+}
+
+function TransactionRow({
+  tx,
+  data,
+  onOpen,
+  selection,
+}: {
+  tx: Transaction
+  data: AppData
+  onOpen: (t: Transaction) => void
+  selection?: Selection
+}) {
   const meta = TX_META[tx.type]
   const cat = tx.categoryId ? data.categoryMap.get(tx.categoryId) : undefined
   const src = tx.sourceWalletId ? data.walletMap.get(tx.sourceWalletId) : undefined
@@ -23,15 +41,25 @@ function TransactionRow({ tx, data, onOpen }: { tx: Transaction; data: AppData; 
   const title = tx.type === 'transfer' ? 'โอนเงิน' : cat?.name ?? meta.label
   const walletText = tx.type === 'transfer' ? `${src?.name} → ${dst?.name}` : (tx.type === 'income' ? dst : src)?.name
   const walletColor = (tx.type === 'income' ? dst : src)?.color
+  const checked = selection?.selected.has(tx.id) ?? false
 
   return (
     <li>
       <button
         type="button"
-        onClick={() => onOpen(tx)}
-        className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-sunken/60 md:grid-cols-[auto_minmax(0,1.3fr)_minmax(0,1fr)_auto] md:px-5"
+        onClick={() => (selection ? selection.toggle(tx.id) : onOpen(tx))}
+        aria-pressed={selection ? checked : undefined}
+        className={`grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3 text-left transition-colors md:grid-cols-[auto_minmax(0,1.3fr)_minmax(0,1fr)_auto] md:px-5 ${
+          checked ? 'bg-brand-soft/60' : 'hover:bg-sunken/60'
+        }`}
       >
-        <TxIcon tx={tx} data={data} />
+        {selection ? (
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center" aria-hidden>
+            <input type="checkbox" className="h-5 w-5 accent-brand" checked={checked} readOnly tabIndex={-1} />
+          </span>
+        ) : (
+          <TxIcon tx={tx} data={data} />
+        )}
         <span className="min-w-0">
           <span className="block truncate font-medium">{title}</span>
           <span className="block truncate text-sm text-muted">
@@ -66,12 +94,14 @@ export function TransactionList({
   data,
   onOpen,
   flat = false,
+  selection,
 }: {
   transactions: Transaction[]
   data: AppData
   onOpen: (t: Transaction) => void
   /** ไม่ใส่กรอบการ์ด (ใช้ภายในการ์ดอื่น) */
   flat?: boolean
+  selection?: Selection
 }) {
   const groups: { date: string; items: Transaction[] }[] = []
   for (const tx of transactions) {
@@ -93,7 +123,7 @@ export function TransactionList({
             </h3>
             <ul className="divide-y divide-line/70">
               {g.items.map((tx) => (
-                <TransactionRow key={tx.id} tx={tx} data={data} onOpen={onOpen} />
+                <TransactionRow key={tx.id} tx={tx} data={data} onOpen={onOpen} selection={selection} />
               ))}
             </ul>
           </section>

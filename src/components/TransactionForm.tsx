@@ -7,7 +7,7 @@ import { TX_META } from '../lib/labels'
 import { amountToInput, formatBaht, parseAmount } from '../lib/money'
 import { getPref, setPref } from '../lib/prefs'
 import type { Transaction, TransactionType, Wallet } from '../lib/types'
-import { errorMessage, FormError, Sheet, useConfirm, useToast, WalletIcon } from './ui'
+import { CategoryIcon, errorMessage, FormError, Sheet, useConfirm, useToast, WalletIcon } from './ui'
 
 function WalletPicker({
   label,
@@ -254,9 +254,7 @@ export function TransactionForm({
                       on ? 'border-brand bg-brand-soft font-semibold text-brand' : 'border-line text-ink-2 hover:bg-sunken'
                     }`}
                   >
-                    <span className="text-xl" aria-hidden>
-                      {c.icon}
-                    </span>
+                    <CategoryIcon category={c} size="sm" />
                     <span className="line-clamp-1">{c.name}</span>
                   </button>
                 )

@@ -35,7 +35,9 @@ export interface Category {
   id: string
   name: string
   type: CategoryType
-  icon: string
+  icon: string // อีโมจิ (ใช้เมื่อไม่มี iconName)
+  iconName?: string // ชื่อไอคอนจากชุดใน lib/icons.ts
+  color?: string
 }
 
 export type TransactionInput = Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>

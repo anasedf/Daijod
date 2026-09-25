@@ -387,7 +387,7 @@ export function ImportSheet({ data, onClose, walletId: initialWallet }: { data: 
                     <option value={`${own}:`}>{own === 'income' ? 'รายรับ' : 'รายจ่าย'} · ไม่ระบุหมวด</option>
                     {cats.map((c) => (
                       <option key={c.id} value={`${own}:${c.id}`}>
-                        {c.icon} {c.name}
+                        {c.name}
                       </option>
                     ))}
                   </optgroup>

@@ -9,8 +9,9 @@ import {
   type ReactNode,
 } from 'react'
 import { UserError } from '../lib/db'
+import { iconByName } from '../lib/icons'
 import { WALLET_TYPES } from '../lib/labels'
-import type { Wallet } from '../lib/types'
+import type { Category, Wallet } from '../lib/types'
 
 // ---------- Sheet (มือถือ: เลื่อนขึ้นจากด้านล่าง / จอใหญ่: หน้าต่างกลางจอ) ----------
 
@@ -111,6 +112,46 @@ export function WalletIcon({ wallet, size = 'md' }: { wallet: Wallet; size?: 'sm
       aria-hidden
     >
       <Icon size={size === 'sm' ? 15 : size === 'lg' ? 22 : 18} strokeWidth={2} />
+    </span>
+  )
+}
+
+const BOX = {
+  sm: { box: 'h-7 w-7 rounded-lg text-base', icon: 15 },
+  md: { box: 'h-10 w-10 rounded-xl text-lg', icon: 19 },
+  lg: { box: 'h-14 w-14 rounded-2xl text-2xl', icon: 26 },
+}
+
+/** ไอคอนหมวดหมู่: ไอคอนลายเส้นบนพื้นสีของหมวด หรืออีโมจิถ้าหมวดยังใช้อีโมจิอยู่ */
+export function CategoryIcon({
+  category,
+  size = 'md',
+  fallback,
+  className = '',
+}: {
+  category?: Category
+  size?: 'sm' | 'md' | 'lg'
+  /** แสดงเมื่อไม่มีหมวด */
+  fallback?: ReactNode
+  className?: string
+}) {
+  const s = BOX[size]
+  const Icon = iconByName(category?.iconName)
+  const color = category?.color ?? '#475569'
+  if (Icon) {
+    return (
+      <span
+        className={`flex shrink-0 items-center justify-center ${s.box} ${className}`}
+        style={{ backgroundColor: `color-mix(in oklab, ${color} 16%, transparent)`, color }}
+        aria-hidden
+      >
+        <Icon size={s.icon} />
+      </span>
+    )
+  }
+  return (
+    <span className={`flex shrink-0 items-center justify-center bg-sunken ${s.box} ${className}`} aria-hidden>
+      {category ? category.icon : fallback}
     </span>
   )
 }

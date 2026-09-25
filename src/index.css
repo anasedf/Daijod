@@ -81,6 +81,13 @@
   :focus-visible {
     @apply outline-2 outline-offset-2 outline-brand;
   }
+  /* ไอคอนทั้งแอปเป็นลายเส้นมือวาด: เส้นหนา ปลายมน บิดเล็กน้อย (filter #doodle อยู่ใน App.tsx) */
+  svg.lucide {
+    stroke-width: 2.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    filter: url(#doodle);
+  }
 }
 
 @layer components {

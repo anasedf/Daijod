@@ -10,11 +10,24 @@ export class DaijodDB extends Dexie {
 
   constructor(name = 'daijod') {
     super(name)
-    this.version(1).stores({
+    const stores = {
       wallets: 'id, name',
       transactions: 'id, date, type, sourceWalletId, destinationWalletId, categoryId',
       categories: 'id, type',
-    })
+    }
+    this.version(1).stores(stores)
+    // v2: หมวดมีไอคอนและสี เติมให้หมวดเริ่มต้นที่ยังไม่มี
+    this.version(2)
+      .stores(stores)
+      .upgrade((tx) =>
+        tx.table('categories').toCollection().modify((c: Category) => {
+          const d = DEFAULT_CATEGORIES.find((x) => x.id === c.id)
+          if (d && !c.iconName) {
+            c.iconName = d.iconName
+            c.color = d.color
+          }
+        }),
+      )
     this.on('populate', (tx) => {
       tx.table('categories').bulkAdd(DEFAULT_CATEGORIES)
     })
@@ -22,18 +35,18 @@ export class DaijodDB extends Dexie {
 }
 
 export const DEFAULT_CATEGORIES: Category[] = [
-  { id: 'exp-food', name: 'อาหาร', type: 'expense', icon: '🍜' },
-  { id: 'exp-travel', name: 'เดินทาง', type: 'expense', icon: '🚌' },
-  { id: 'exp-home', name: 'บ้าน', type: 'expense', icon: '🏠' },
-  { id: 'exp-bills', name: 'ค่าน้ำ/ไฟ/เน็ต', type: 'expense', icon: '💡' },
-  { id: 'exp-health', name: 'สุขภาพ', type: 'expense', icon: '💊' },
-  { id: 'exp-shopping', name: 'ช้อปปิ้ง', type: 'expense', icon: '🛍️' },
-  { id: 'exp-fun', name: 'บันเทิง', type: 'expense', icon: '🎬' },
-  { id: 'exp-other', name: 'อื่น ๆ', type: 'expense', icon: '📦' },
-  { id: 'inc-salary', name: 'เงินเดือน', type: 'income', icon: '💼' },
-  { id: 'inc-extra', name: 'รายได้เสริม', type: 'income', icon: '💰' },
-  { id: 'inc-gift', name: 'ได้รับ/ของขวัญ', type: 'income', icon: '🎁' },
-  { id: 'inc-other', name: 'อื่น ๆ', type: 'income', icon: '📥' },
+  { id: 'exp-food', name: 'อาหาร', type: 'expense', icon: '🍜', iconName: 'Utensils', color: '#c2410c' },
+  { id: 'exp-travel', name: 'เดินทาง', type: 'expense', icon: '🚌', iconName: 'Bus', color: '#1d4ed8' },
+  { id: 'exp-home', name: 'บ้าน', type: 'expense', icon: '🏠', iconName: 'House', color: '#a16207' },
+  { id: 'exp-bills', name: 'ค่าน้ำ/ไฟ/เน็ต', type: 'expense', icon: '💡', iconName: 'Lightbulb', color: '#7e22ce' },
+  { id: 'exp-health', name: 'สุขภาพ', type: 'expense', icon: '💊', iconName: 'Pill', color: '#be185d' },
+  { id: 'exp-shopping', name: 'ช้อปปิ้ง', type: 'expense', icon: '🛍️', iconName: 'ShoppingBag', color: '#0369a1' },
+  { id: 'exp-fun', name: 'บันเทิง', type: 'expense', icon: '🎬', iconName: 'Clapperboard', color: '#6d28d9' },
+  { id: 'exp-other', name: 'อื่น ๆ', type: 'expense', icon: '📦', iconName: 'Package', color: '#475569' },
+  { id: 'inc-salary', name: 'เงินเดือน', type: 'income', icon: '💼', iconName: 'Briefcase', color: '#0f766e' },
+  { id: 'inc-extra', name: 'รายได้เสริม', type: 'income', icon: '💰', iconName: 'Coins', color: '#15803d' },
+  { id: 'inc-gift', name: 'ได้รับ/ของขวัญ', type: 'income', icon: '🎁', iconName: 'Gift', color: '#be185d' },
+  { id: 'inc-other', name: 'อื่น ๆ', type: 'income', icon: '📥', iconName: 'Inbox', color: '#475569' },
 ]
 
 export const db = new DaijodDB()
@@ -115,6 +128,18 @@ export async function deleteTransaction(id: string, d: DaijodDB = db) {
   await d.transactions.delete(id)
 }
 
+export async function deleteTransactions(ids: string[], d: DaijodDB = db) {
+  await d.transactions.bulkDelete(ids)
+}
+
+/** ลบทุกอย่างแล้วกลับไปเป็นแอปเปล่า ๆ (เหลือหมวดเริ่มต้น) UI ต้องยืนยันกับผู้ใช้ก่อน */
+export async function resetAllData(d: DaijodDB = db) {
+  await d.transaction('rw', d.wallets, d.transactions, d.categories, async () => {
+    await Promise.all([d.wallets.clear(), d.transactions.clear(), d.categories.clear()])
+    await d.categories.bulkAdd(DEFAULT_CATEGORIES)
+  })
+}
+
 /** เพิ่มหลายรายการในครั้งเดียว (จาก statement) ถ้ามีรายการใดผิดหรือซ้ำ จะไม่บันทึกเลยสักรายการ */
 export async function importTransactions(inputs: TransactionInput[], d: DaijodDB = db): Promise<number> {
   const cleans = inputs.map(normalizeTransaction)
@@ -147,9 +172,13 @@ export async function addCategory(input: Omit<Category, 'id'>, d: DaijodDB = db)
   return id
 }
 
-export async function updateCategory(id: string, input: Pick<Category, 'name' | 'icon'>, d: DaijodDB = db) {
+export async function updateCategory(
+  id: string,
+  input: Pick<Category, 'name' | 'icon' | 'iconName' | 'color'>,
+  d: DaijodDB = db,
+) {
   if (!input.name.trim()) throw new UserError('กรุณาตั้งชื่อหมวด')
-  await d.categories.update(id, { name: input.name.trim(), icon: input.icon })
+  await d.categories.update(id, { name: input.name.trim(), icon: input.icon, iconName: input.iconName, color: input.color })
 }
 
 /** ลบหมวดได้เฉพาะเมื่อไม่มีรายการใช้อยู่ เพื่อไม่ให้รายการเสียข้อมูลเงียบ ๆ */

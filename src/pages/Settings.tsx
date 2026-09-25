@@ -1,10 +1,18 @@
-import { Download, FileUp, HardDrive, Plus, Upload } from 'lucide-react'
+import { Download, FileUp, HardDrive, Plus, TriangleAlert, Upload } from 'lucide-react'
 import { useRef, useState, type FormEvent } from 'react'
 import { ImportSheet } from '../components/ImportSheet'
-import { errorMessage, FormError, PageHeader, Sheet, useConfirm, useToast } from '../components/ui'
+import { CategoryIcon, errorMessage, FormError, PageHeader, Sheet, useConfirm, useToast } from '../components/ui'
 import type { AppData } from '../hooks/useData'
-import { addCategory, deleteCategory, exportBackup, importBackup, updateCategory } from '../lib/db'
+import {
+  addCategory,
+  deleteCategory,
+  exportBackup,
+  importBackup,
+  resetAllData,
+  updateCategory,
+} from '../lib/db'
 import { todayISO } from '../lib/dates'
+import { CATEGORY_COLORS, ICON_GROUPS } from '../lib/icons'
 import type { Category, CategoryType } from '../lib/types'
 
 function CategoryForm({
@@ -19,17 +27,21 @@ function CategoryForm({
   const toast = useToast()
   const confirm = useConfirm()
   const [name, setName] = useState(category?.name ?? '')
-  const [icon, setIcon] = useState(category?.icon ?? (type === 'income' ? '💰' : '📦'))
+  const [iconName, setIconName] = useState(category?.iconName ?? (category ? '' : type === 'income' ? 'Coins' : 'Package'))
+  const [emoji, setEmoji] = useState(category?.iconName ? '' : category?.icon ?? '')
+  const [color, setColor] = useState(category?.color ?? CATEGORY_COLORS[0])
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+
+  const preview: Category = { id: '', name, type, icon: emoji || '📦', iconName: iconName || undefined, color }
 
   async function submit(e: FormEvent) {
     e.preventDefault()
     setSaving(true)
     try {
-      const i = icon.trim() || '📦'
-      if (category) await updateCategory(category.id, { name, icon: i })
-      else await addCategory({ name, icon: i, type })
+      const input = { name, icon: emoji.trim() || '📦', iconName: iconName || undefined, color }
+      if (category) await updateCategory(category.id, input)
+      else await addCategory({ ...input, type })
       toast(category ? 'แก้ไขหมวดแล้ว' : 'เพิ่มหมวดแล้ว')
       onClose()
     } catch (err) {
@@ -60,6 +72,7 @@ function CategoryForm({
     <Sheet
       title={`${category ? 'แก้ไข' : 'เพิ่ม'}หมวด${type === 'income' ? 'รายรับ' : 'รายจ่าย'}`}
       onClose={onClose}
+      size="lg"
       footer={
         <div className="flex gap-3">
           {category && (
@@ -73,21 +86,10 @@ function CategoryForm({
         </div>
       }
     >
-      <form id="category-form" onSubmit={submit} className="space-y-4">
-        <div className="grid grid-cols-[5rem_1fr] gap-3">
-          <div>
-            <label className="label" htmlFor="c-icon">
-              ไอคอน
-            </label>
-            <input
-              id="c-icon"
-              className="field text-center text-2xl"
-              value={icon}
-              onChange={(e) => setIcon(e.target.value)}
-              maxLength={4}
-            />
-          </div>
-          <div>
+      <form id="category-form" onSubmit={submit} className="space-y-5">
+        <div className="flex items-center gap-4">
+          <CategoryIcon category={preview} size="lg" />
+          <div className="flex-1">
             <label className="label" htmlFor="c-name">
               ชื่อหมวด
             </label>
@@ -98,11 +100,80 @@ function CategoryForm({
               onChange={(e) => setName(e.target.value)}
               maxLength={30}
               required
-              autoFocus
+              autoFocus={!category}
             />
           </div>
         </div>
-        <p className="text-xs text-muted">ใส่อีโมจิเป็นไอคอนได้ (บนมือถือกดปุ่มอีโมจิบนแป้นพิมพ์ บน Windows กด Win + .)</p>
+
+        <fieldset>
+          <legend className="label">สี</legend>
+          <div className="flex flex-wrap gap-2.5">
+            {CATEGORY_COLORS.map((c, i) => (
+              <button
+                key={c}
+                type="button"
+                aria-label={`สีที่ ${i + 1}`}
+                aria-pressed={color === c}
+                onClick={() => setColor(c)}
+                className={`h-8 w-8 rounded-full transition-transform hover:scale-110 ${
+                  color === c ? 'ring-2 ring-ink ring-offset-2 ring-offset-surface' : ''
+                }`}
+                style={{ backgroundColor: c }}
+              />
+            ))}
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend className="label">ไอคอน</legend>
+          <div className="max-h-64 space-y-3 overflow-y-auto rounded-xl border border-line p-3">
+            {ICON_GROUPS.map((g) => (
+              <div key={g.label}>
+                <div className="mb-1.5 text-xs font-medium text-muted">{g.label}</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {g.icons.map(({ name: n, Icon }) => {
+                    const on = iconName === n
+                    return (
+                      <button
+                        key={n}
+                        type="button"
+                        aria-label={n}
+                        aria-pressed={on}
+                        onClick={() => {
+                          setIconName(n)
+                          setEmoji('')
+                        }}
+                        className={`flex h-10 w-10 items-center justify-center rounded-xl transition-colors ${
+                          on ? 'ring-2 ring-brand' : 'hover:bg-sunken'
+                        }`}
+                        style={on ? { backgroundColor: `color-mix(in oklab, ${color} 16%, transparent)`, color } : undefined}
+                      >
+                        <Icon size={20} />
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-2 flex items-center gap-2 text-sm text-ink-2">
+            <label htmlFor="c-emoji" className="shrink-0">
+              หรือใช้อีโมจิ
+            </label>
+            <input
+              id="c-emoji"
+              className="field min-h-9 w-20 text-center text-lg"
+              value={emoji}
+              maxLength={4}
+              placeholder="🍜"
+              onChange={(e) => {
+                setEmoji(e.target.value)
+                if (e.target.value) setIconName('')
+              }}
+            />
+          </div>
+        </fieldset>
+
         {error && <FormError>{error}</FormError>}
       </form>
     </Sheet>
@@ -159,6 +230,31 @@ export function SettingsPage({ data }: { data: AppData }) {
     }
   }
 
+  async function resetAll() {
+    const ok = await confirm({
+      title: 'ลบข้อมูลทั้งหมด?',
+      danger: true,
+      confirmLabel: 'ลบทั้งหมด',
+      message: (
+        <div className="space-y-2">
+          <p>
+            กระเป๋า <b className="text-ink">{data.wallets.length}</b> ใบ และรายการ{' '}
+            <b className="text-ink">{data.transactions.length}</b> รายการ จะถูกลบทั้งหมดและ<b className="text-ink">กู้คืนไม่ได้</b>{' '}
+            หมวดหมู่จะกลับเป็นค่าเริ่มต้น
+          </p>
+          <p className="text-sm text-muted">ถ้ายังไม่แน่ใจ กด “ดาวน์โหลดไฟล์สำรอง” เก็บไว้ก่อน</p>
+        </div>
+      ),
+    })
+    if (!ok) return
+    try {
+      await resetAllData()
+      toast('ลบข้อมูลทั้งหมดแล้ว')
+    } catch (e) {
+      toast(errorMessage(e), 'error')
+    }
+  }
+
   return (
     <>
       <PageHeader title="ตั้งค่า" subtitle="หมวดหมู่และการสำรองข้อมูล" />
@@ -172,7 +268,7 @@ export function SettingsPage({ data }: { data: AppData }) {
                 <div className="mb-4 flex items-center justify-between">
                   <div>
                     <h2 className="card-title">หมวด{type === 'income' ? 'รายรับ' : 'รายจ่าย'}</h2>
-                    <p className="text-xs text-muted">{cats.length} หมวด · แตะเพื่อแก้ไข</p>
+                    <p className="text-xs text-muted">{cats.length} หมวด · แตะเพื่อแก้ไขชื่อ ไอคอน หรือสี</p>
                   </div>
                   <button className="btn-ghost -mr-2 min-h-9 px-3 text-sm text-brand" onClick={() => setEditing({ type })}>
                     <Plus size={16} aria-hidden /> เพิ่มหมวด
@@ -182,13 +278,11 @@ export function SettingsPage({ data }: { data: AppData }) {
                   {cats.map((c) => (
                     <li key={c.id}>
                       <button
-                        className="flex w-full items-center gap-2.5 rounded-xl border border-line px-3 py-2.5 text-left text-sm transition-colors hover:border-brand/40 hover:bg-sunken"
+                        className="flex w-full items-center gap-2.5 rounded-xl border border-line px-2.5 py-2 text-left text-sm transition-colors hover:border-brand/40 hover:bg-sunken"
                         onClick={() => setEditing({ type, category: c })}
                         aria-label={`แก้ไขหมวด ${c.name}`}
                       >
-                        <span className="text-xl" aria-hidden>
-                          {c.icon}
-                        </span>
+                        <CategoryIcon category={c} size="sm" />
                         <span className="truncate">{c.name}</span>
                       </button>
                     </li>
@@ -197,65 +291,80 @@ export function SettingsPage({ data }: { data: AppData }) {
               </section>
             )
           })}
+
+          <section className="card border-expense/30 p-5">
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-expense-soft text-expense" aria-hidden>
+                <TriangleAlert size={20} />
+              </span>
+              <h2 className="card-title">ลบข้อมูลทั้งหมด</h2>
+            </div>
+            <p className="mt-3 text-sm text-ink-2">
+              ลบกระเป๋าและรายการทั้งหมดในเครื่องนี้ เริ่มใหม่ตั้งแต่ต้น ถ้าต้องการลบแค่บางรายการ ไปที่หน้า “รายการ” แล้วกด “เลือก”
+            </p>
+            <button className="btn-danger mt-4" onClick={resetAll} disabled={data.wallets.length === 0 && data.transactions.length === 0}>
+              ลบข้อมูลทั้งหมด
+            </button>
+          </section>
         </div>
 
         <div className="space-y-4 lg:sticky lg:top-8 lg:space-y-5">
-        <section className="card p-5">
-          <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-soft text-brand" aria-hidden>
-              <FileUp size={20} />
-            </span>
-            <h2 className="card-title">นำเข้าจาก statement</h2>
-          </div>
-          <p className="mt-3 text-sm text-ink-2">
-            อ่านรายการจากไฟล์ statement ของธนาคาร (ตอนนี้รองรับกสิกรไทย) แล้วตรวจก่อนบันทึก ไฟล์ถูกอ่านในเครื่องนี้เท่านั้น
-          </p>
-          <button className="btn-secondary mt-4 w-full" onClick={() => setImporting(true)} disabled={data.wallets.length === 0}>
-            <FileUp size={18} aria-hidden /> เลือกไฟล์ statement
-          </button>
-        </section>
+          <section className="card p-5">
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-soft text-brand" aria-hidden>
+                <FileUp size={20} />
+              </span>
+              <h2 className="card-title">นำเข้าจาก statement</h2>
+            </div>
+            <p className="mt-3 text-sm text-ink-2">
+              อ่านรายการจากไฟล์ statement ของธนาคาร (ตอนนี้รองรับกสิกรไทย) แล้วตรวจก่อนบันทึก ไฟล์ถูกอ่านในเครื่องนี้เท่านั้น
+            </p>
+            <button className="btn-secondary mt-4 w-full" onClick={() => setImporting(true)} disabled={data.wallets.length === 0}>
+              <FileUp size={18} aria-hidden /> เลือกไฟล์ statement
+            </button>
+          </section>
 
-        <section className="card p-5">
-          <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-soft text-brand" aria-hidden>
-              <HardDrive size={20} />
-            </span>
-            <h2 className="card-title">สำรองข้อมูล</h2>
-          </div>
-          <p className="mt-3 text-sm text-ink-2">
-            ข้อมูลทั้งหมดเก็บอยู่ในเบราว์เซอร์ของเครื่องนี้เท่านั้น ถ้าล้างข้อมูลเบราว์เซอร์หรือเปลี่ยนเครื่อง
-            ข้อมูลจะหาย ควรสำรองเก็บไว้เป็นระยะ
-          </p>
-          <dl className="mt-4 grid grid-cols-2 gap-2 text-center">
-            <div className="rounded-xl bg-sunken p-3">
-              <dt className="text-xs text-muted">กระเป๋า</dt>
-              <dd className="num text-lg font-semibold">{data.wallets.length}</dd>
+          <section className="card p-5">
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-soft text-brand" aria-hidden>
+                <HardDrive size={20} />
+              </span>
+              <h2 className="card-title">สำรองข้อมูล</h2>
             </div>
-            <div className="rounded-xl bg-sunken p-3">
-              <dt className="text-xs text-muted">รายการ</dt>
-              <dd className="num text-lg font-semibold">{data.transactions.length}</dd>
+            <p className="mt-3 text-sm text-ink-2">
+              ข้อมูลทั้งหมดเก็บอยู่ในเบราว์เซอร์ของเครื่องนี้เท่านั้น ถ้าล้างข้อมูลเบราว์เซอร์หรือเปลี่ยนเครื่อง
+              ข้อมูลจะหาย ควรสำรองเก็บไว้เป็นระยะ
+            </p>
+            <dl className="mt-4 grid grid-cols-2 gap-2 text-center">
+              <div className="rounded-xl bg-sunken p-3">
+                <dt className="text-xs text-muted">กระเป๋า</dt>
+                <dd className="num text-lg font-semibold">{data.wallets.length}</dd>
+              </div>
+              <div className="rounded-xl bg-sunken p-3">
+                <dt className="text-xs text-muted">รายการ</dt>
+                <dd className="num text-lg font-semibold">{data.transactions.length}</dd>
+              </div>
+            </dl>
+            <div className="mt-4 space-y-2">
+              <button className="btn-primary w-full" onClick={exportFile}>
+                <Download size={18} aria-hidden /> ดาวน์โหลดไฟล์สำรอง
+              </button>
+              <button className="btn-secondary w-full" onClick={() => fileInput.current?.click()}>
+                <Upload size={18} aria-hidden /> นำเข้าจากไฟล์สำรอง
+              </button>
             </div>
-          </dl>
-          <div className="mt-4 space-y-2">
-            <button className="btn-primary w-full" onClick={exportFile}>
-              <Download size={18} aria-hidden /> ดาวน์โหลดไฟล์สำรอง
-            </button>
-            <button className="btn-secondary w-full" onClick={() => fileInput.current?.click()}>
-              <Upload size={18} aria-hidden /> นำเข้าจากไฟล์สำรอง
-            </button>
-          </div>
-          <input
-            ref={fileInput}
-            type="file"
-            accept="application/json,.json"
-            className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0]
-              e.target.value = ''
-              if (f) importFile(f)
-            }}
-          />
-        </section>
+            <input
+              ref={fileInput}
+              type="file"
+              accept="application/json,.json"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0]
+                e.target.value = ''
+                if (f) importFile(f)
+              }}
+            />
+          </section>
         </div>
       </div>
 

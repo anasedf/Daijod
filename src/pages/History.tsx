@@ -1,22 +1,27 @@
-import { FileUp, ReceiptText, Search, SearchX, X } from 'lucide-react'
+import { CheckSquare, FileUp, ReceiptText, Search, SearchX, Trash2, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { ImportSheet } from '../components/ImportSheet'
 import { defaultRange, RangePicker, resolveRange } from '../components/RangePicker'
 import { TransactionList } from '../components/TransactionList'
-import { EmptyState, PageHeader } from '../components/ui'
+import { EmptyState, errorMessage, PageHeader, useConfirm, useToast } from '../components/ui'
 import type { AppData } from '../hooks/useData'
+import { deleteTransactions } from '../lib/db'
 import { TX_META } from '../lib/labels'
 import { filterTransactions, sortNewestFirst, summarize } from '../lib/ledger'
 import { formatBaht } from '../lib/money'
 import type { Transaction, TransactionType } from '../lib/types'
 
 export function HistoryPage({ data, onOpen }: { data: AppData; onOpen: (t: Transaction) => void }) {
+  const toast = useToast()
+  const confirm = useConfirm()
   const [range, setRange] = useState(defaultRange('all'))
   const [type, setType] = useState<TransactionType | ''>('')
   const [walletId, setWalletId] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [search, setSearch] = useState('')
   const [importing, setImporting] = useState(false)
+  // โหมดเลือกหลายรายการเพื่อลบ (null = ไม่ได้เลือก)
+  const [selected, setSelected] = useState<Set<string> | null>(null)
 
   const results = useMemo(
     () =>
@@ -42,6 +47,38 @@ export function HistoryPage({ data, onOpen }: { data: AppData; onOpen: (t: Trans
     setSearch('')
   }
 
+  const selection = selected
+    ? {
+        selected,
+        toggle: (id: string) =>
+          setSelected((s) => {
+            const n = new Set(s)
+            if (n.has(id)) n.delete(id)
+            else n.add(id)
+            return n
+          }),
+      }
+    : undefined
+  const allShownSelected = selected !== null && results.length > 0 && results.every((t) => selected.has(t.id))
+
+  async function removeSelected() {
+    if (!selected || selected.size === 0) return
+    const ok = await confirm({
+      title: `ลบ ${selected.size} รายการ?`,
+      danger: true,
+      confirmLabel: `ลบ ${selected.size} รายการ`,
+      message: <p>รายการที่เลือกจะถูกลบและกู้คืนไม่ได้ ยอดกระเป๋าจะคำนวณใหม่</p>,
+    })
+    if (!ok) return
+    try {
+      await deleteTransactions([...selected])
+      toast(`ลบ ${selected.size} รายการแล้ว`)
+      setSelected(null)
+    } catch (e) {
+      toast(errorMessage(e), 'error')
+    }
+  }
+
   return (
     <>
       <PageHeader
@@ -49,7 +86,17 @@ export function HistoryPage({ data, onOpen }: { data: AppData; onOpen: (t: Trans
         subtitle={`ทั้งหมด ${data.transactions.length} รายการ`}
         actions={
           <>
-            {data.wallets.length > 0 && (
+            {data.transactions.length > 0 && (
+              <button
+                type="button"
+                className={`order-last sm:order-first ${selected ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setSelected(selected ? null : new Set())}
+                aria-pressed={!!selected}
+              >
+                <CheckSquare size={18} aria-hidden /> {selected ? 'เลิกเลือก' : 'เลือก'}
+              </button>
+            )}
+            {data.wallets.length > 0 && !selected && (
               <button type="button" className="btn-secondary order-last sm:order-first" onClick={() => setImporting(true)}>
                 <FileUp size={18} aria-hidden /> นำเข้า statement
               </button>
@@ -116,7 +163,7 @@ export function HistoryPage({ data, onOpen }: { data: AppData; onOpen: (t: Trans
                 <option value="">ทุกหมวด</option>
                 {catOptions.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.icon} {c.name}
+                    {c.name}
                     {!type && ` (${c.type === 'income' ? 'รับ' : 'จ่าย'})`}
                   </option>
                 ))}
@@ -163,7 +210,7 @@ export function HistoryPage({ data, onOpen }: { data: AppData; onOpen: (t: Trans
               )}
             </div>
           ) : (
-            <TransactionList transactions={results} data={data} onOpen={onOpen} />
+            <TransactionList transactions={results} data={data} onOpen={onOpen} selection={selection} />
           )}
         </div>
 
@@ -198,6 +245,40 @@ export function HistoryPage({ data, onOpen }: { data: AppData; onOpen: (t: Trans
           )}
         </aside>
       </div>
+
+      {/* แถบคำสั่งตอนเลือกหลายรายการ */}
+      {selected && (
+        <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-20 px-4 lg:bottom-6 lg:left-64">
+          <div className="anim-sheet mx-auto flex max-w-2xl flex-wrap items-center gap-2 rounded-2xl bg-ink px-4 py-3 text-sm text-canvas shadow-2xl">
+            <span className="font-medium">
+              เลือก <span className="num">{selected.size}</span> รายการ
+            </span>
+            <button
+              type="button"
+              className="rounded-lg px-2 py-1 text-canvas/80 hover:bg-white/10 hover:text-canvas"
+              onClick={() => setSelected(allShownSelected ? new Set() : new Set(results.map((t) => t.id)))}
+            >
+              {allShownSelected ? 'ไม่เลือกเลย' : `เลือกทั้งหมดที่แสดง (${results.length})`}
+            </button>
+            <span className="flex-1" />
+            <button
+              type="button"
+              className="rounded-lg px-3 py-1.5 text-canvas/80 hover:bg-white/10 hover:text-canvas"
+              onClick={() => setSelected(null)}
+            >
+              ยกเลิก
+            </button>
+            <button
+              type="button"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-expense px-3 py-1.5 font-semibold text-white disabled:opacity-40"
+              disabled={selected.size === 0}
+              onClick={removeSelected}
+            >
+              <Trash2 size={16} aria-hidden /> ลบ
+            </button>
+          </div>
+        </div>
+      )}
     </>
   )
 }
