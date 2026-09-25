@@ -1,11 +1,13 @@
-import { ArrowDown, ArrowUp, ArrowUpDown, Download, FileUp, HardDrive, Pencil, Plus, Trash2, Upload } from 'lucide-react'
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronRight, Download, FileUp, HardDrive, Pencil, Plus, Trash2, Upload, Wallet } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { DangerZone } from '../components/DangerZone'
 import { ImportRules } from '../components/ImportRules'
 import { ImportSheet } from '../components/ImportSheet'
 import { RecurringSection } from '../components/RecurringForm'
 import { CategoryIcon, errorMessage, FormError, PageHeader, Sheet, useConfirm, useToast } from '../components/ui'
+import type { Tab } from '../App'
 import type { AppData } from '../hooks/useData'
+import { formatBaht } from '../lib/money'
 import {
   addCategory,
   countCategoryUse,
@@ -275,7 +277,7 @@ function CategoryForm({
   )
 }
 
-export function SettingsPage({ data }: { data: AppData }) {
+export function SettingsPage({ data, onNavigate }: { data: AppData; onNavigate?: (tab: Tab) => void }) {
   const toast = useToast()
   const confirm = useConfirm()
   const fileInput = useRef<HTMLInputElement>(null)
@@ -339,10 +341,29 @@ export function SettingsPage({ data }: { data: AppData }) {
 
   return (
     <>
-      <PageHeader title="ตั้งค่า" subtitle="หมวดหมู่และการสำรองข้อมูล" />
+      <PageHeader title="ตั้งค่า" subtitle="กระเป๋า หมวดหมู่ และการสำรองข้อมูล" />
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-5">
         <div className="space-y-4 lg:space-y-5">
+          {/* มือถือไม่มีแท็บกระเป๋า ให้เข้าจากตรงนี้ */}
+          {onNavigate && (
+            <button
+              type="button"
+              onClick={() => onNavigate('wallets')}
+              className="card flex w-full items-center gap-3 p-4 text-left transition-colors hover:bg-sunken lg:hidden"
+            >
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent-soft text-accent-strong" aria-hidden>
+                <Wallet size={20} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-semibold">กระเป๋า</span>
+                <span className="block text-xs text-muted">
+                  {data.wallets.length} กระเป๋า · รวม {formatBaht(data.total)}
+                </span>
+              </span>
+              <ChevronRight size={18} className="text-muted" aria-hidden />
+            </button>
+          )}
           {(['expense', 'income'] as CategoryType[]).map((type) => {
             const cats = data.categories.filter((c) => c.type === type)
             return (

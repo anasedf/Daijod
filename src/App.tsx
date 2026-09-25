@@ -1,4 +1,4 @@
-import { House, MonitorSmartphone, Moon, Plus, ReceiptText, Settings, Sun, Wallet, type LucideIcon } from 'lucide-react'
+import { ChartPie, House, MonitorSmartphone, Moon, Plus, ReceiptText, Settings, Sun, Wallet, type LucideIcon } from 'lucide-react'
 import { Component, useCallback, useEffect, useState, type ReactNode } from 'react'
 import { TransactionForm } from './components/TransactionForm'
 import { UIProvider } from './components/ui'
@@ -10,17 +10,21 @@ import type { Transaction } from './lib/types'
 import { DashboardPage } from './pages/Dashboard'
 import { HistoryPage } from './pages/History'
 import { SettingsPage } from './pages/Settings'
+import { StatsPage } from './pages/Stats'
 import { WalletsPage } from './pages/Wallets'
 
-export type Tab = 'home' | 'history' | 'wallets' | 'settings'
+export type Tab = 'home' | 'history' | 'stats' | 'wallets' | 'settings'
 type Theme = 'system' | 'light' | 'dark'
 
 const TABS: { id: Tab; label: string; Icon: LucideIcon }[] = [
   { id: 'home', label: 'ภาพรวม', Icon: House },
   { id: 'history', label: 'รายการ', Icon: ReceiptText },
+  { id: 'stats', label: 'สถิติ', Icon: ChartPie },
   { id: 'wallets', label: 'กระเป๋า', Icon: Wallet },
   { id: 'settings', label: 'ตั้งค่า', Icon: Settings },
 ]
+// มือถือมีที่ 4 แท็บ + ปุ่มจด: กระเป๋าเข้าได้จากการ์ดยอดรวมและหน้าตั้งค่า
+const MOBILE_TABS = TABS.filter((t) => t.id !== 'wallets')
 
 type Editor = { kind: 'tx'; tx?: Transaction } | { kind: 'wallet' } | null
 
@@ -164,10 +168,12 @@ function Shell() {
           />
         ) : tab === 'history' ? (
           <HistoryPage data={data} onOpen={openTx} />
+        ) : tab === 'stats' ? (
+          <StatsPage data={data} onNavigate={setTab} />
         ) : tab === 'wallets' ? (
           <WalletsPage data={data} />
         ) : (
-          <SettingsPage data={data} />
+          <SettingsPage data={data} onNavigate={setTab} />
         )}
       </main>
 
@@ -178,7 +184,7 @@ function Shell() {
         aria-label="เมนูหลัก"
       >
         <ul className="mx-auto grid h-[4.25rem] max-w-xl grid-cols-5 items-center">
-          {[...TABS.slice(0, 2), null, ...TABS.slice(2)].map((t) =>
+          {[...MOBILE_TABS.slice(0, 2), null, ...MOBILE_TABS.slice(2)].map((t) =>
             t === null ? (
               <li key="add" className="flex justify-center">
                 <button

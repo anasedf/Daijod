@@ -1,22 +1,20 @@
-import { ArrowDownLeft, ArrowUpRight, ChevronRight, Download, HardDrive, ReceiptText, Scale, Wallet, Zap } from 'lucide-react'
-import { useMemo, useState, type ReactNode } from 'react'
+import { ChevronRight, Download, HardDrive, ReceiptText, Wallet, Zap } from 'lucide-react'
+import { useMemo, useState } from 'react'
 import type { Tab } from '../App'
-import { DailyExpenseChart, MonthlyChart } from '../components/Charts'
-import { defaultRange, RangePicker, rangeLabel, resolveRange } from '../components/RangePicker'
+import { CardHeader, categorySlices } from '../components/insights'
 import { TransactionList } from '../components/TransactionList'
 import { CategoryIcon, EmptyState, errorMessage, PageHeader, useToast, WalletIcon } from '../components/ui'
 import type { AppData } from '../hooks/useData'
-import { formatDateLong, formatDateShort, todayISO, toISODate, type DateRange } from '../lib/dates'
 import { backupReminder, downloadBackup, snoozeBackupReminder } from '../lib/backup'
 import { budgetSummary } from '../lib/budget'
+import { formatDateLong, formatDateShort, monthRange, todayISO } from '../lib/dates'
 import { addTransaction, db, postRecurring, skipRecurring } from '../lib/db'
 import { TX_META } from '../lib/labels'
-import { dueRecurrings } from '../lib/recurring'
 import { expenseByCategory, filterTransactions, sortNewestFirst, summarize } from '../lib/ledger'
+import { loanCategoryIds } from '../lib/loans'
 import { formatBaht } from '../lib/money'
-import { loanBalances, loanCategoryIds, type LoanBalance } from '../lib/loans'
 import { suggestQuickAdds, type QuickAdd } from '../lib/quick'
-import { compareMonths, monthLabel, monthlyTotals } from '../lib/trend'
+import { dueRecurrings } from '../lib/recurring'
 import type { Recurring, Transaction } from '../lib/types'
 
 /** รายการประจำที่ถึงกำหนดแล้วในเดือนนี้: บันทึกหรือข้าม */
@@ -90,198 +88,7 @@ function DueRecurrings({ data, onOpen }: { data: AppData; onOpen: (t: Transactio
   )
 }
 
-/** เงินยืม: ใครติดเรา เราติดใคร (จากหมวดให้ยืม/ได้รับคืน/ยืมมา/จ่ายคืน ชื่อคนอยู่ในรายละเอียด) */
-function LoanCard({ data }: { data: AppData }) {
-  const balances = useMemo(() => loanBalances(data.transactions, data.categories), [data])
-  const hasLoanTx = useMemo(() => {
-    const ids = loanCategoryIds(data.categories)
-    return data.transactions.some((t) => t.categoryId && ids.has(t.categoryId))
-  }, [data])
-  if (!hasLoanTx) return null
-  const owedToMe = balances.filter((b) => b.owedToMe > 0)
-  const iOwe = balances.filter((b) => b.iOwe > 0)
-  const totalIn = owedToMe.reduce((s, b) => s + b.owedToMe, 0)
-  const totalOut = iOwe.reduce((s, b) => s + b.iOwe, 0)
-  const subtitle = balances.length === 0
-    ? 'เคลียร์หมดแล้ว'
-    : [totalIn > 0 && `เขาติดเรา ${formatBaht(totalIn)}`, totalOut > 0 && `เราติดเขา ${formatBaht(totalOut)}`].filter(Boolean).join(' · ')
-
-  return (
-    <section className="card lg:col-span-6">
-      <CardHeader title="เงินยืม" subtitle={subtitle} />
-      <div className="grid gap-5 px-5 pb-5 sm:grid-cols-2">
-        <LoanList title="เขาติดเรา" items={owedToMe} pick={(b) => b.owedToMe} tone="text-income" />
-        <LoanList title="เราติดเขา" items={iOwe} pick={(b) => b.iOwe} tone="text-expense" />
-      </div>
-      <p className="border-t border-line/70 px-5 py-2.5 text-xs text-muted">
-        จดด้วยหมวด ให้ยืม / ได้รับคืน / ยืมมา / จ่ายคืน แล้วใส่ชื่อคนในช่องรายละเอียด รายการเหล่านี้ไม่นับเป็นรายรับรายจ่าย
-      </p>
-    </section>
-  )
-}
-
-function LoanList({ title, items, pick, tone }: { title: string; items: LoanBalance[]; pick: (b: LoanBalance) => number; tone: string }) {
-  return (
-    <div>
-      <div className="mb-1.5 flex justify-between text-xs font-semibold text-muted">
-        <span>{title}</span>
-        <span className={`num ${tone}`}>{formatBaht(items.reduce((s, b) => s + pick(b), 0))}</span>
-      </div>
-      {items.length === 0 ? (
-        <p className="text-sm text-muted">ไม่มี</p>
-      ) : (
-        <ul className="divide-y divide-line/70">
-          {items.map((b) => (
-            <li key={b.name} className="flex items-center justify-between gap-3 py-1.5 text-sm">
-              <span className="min-w-0">
-                <span className="block truncate font-medium">{b.name}</span>
-                <span className="block text-xs text-muted">
-                  {b.count} รายการ · ล่าสุด {formatDateShort(b.lastDate)}
-                </span>
-              </span>
-              <span className={`num shrink-0 font-semibold ${tone}`}>{formatBaht(pick(b))}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  )
-}
-
-/** 6 เดือนย้อนหลัง + เดือนนี้เทียบเดือนก่อน */
-function TrendCard({ data }: { data: AppData }) {
-  const { months, cmp } = useMemo(() => {
-    const today = todayISO()
-    const ex = loanCategoryIds(data.categories)
-    return {
-      months: monthlyTotals(data.transactions, today, 6, ex),
-      cmp: compareMonths(data.transactions, data.categoryMap, today, ex),
-    }
-  }, [data])
-  if (months.every((m) => m.income === 0 && m.expense === 0)) return null
-
-  const up = cmp.expenseDiff > 0
-  const pct = cmp.expensePct !== null ? `${Math.abs(Math.round(cmp.expensePct * 100))}%` : null
-  const name = (c: typeof cmp.biggestIncrease) => c?.category?.name ?? 'ไม่ระบุหมวด'
-
-  return (
-    <section className="card lg:col-span-6">
-      <CardHeader title="6 เดือนย้อนหลัง" subtitle={`${monthLabel(months[0].month, true)} – ${monthLabel(months.at(-1)!.month, true)}`} />
-      <div className="px-5 pt-3 pb-5">
-        <MonthlyChart months={months} />
-        <div className="mt-4 space-y-1.5 border-t border-line pt-3 text-sm">
-          <p>
-            เดือนนี้จ่าย{' '}
-            {cmp.expenseDiff === 0 ? (
-              'เท่ากับเดือนก่อน'
-            ) : (
-              <>
-                <b className={up ? 'text-expense' : 'text-income'}>
-                  {up ? 'มากกว่า' : 'น้อยกว่า'}เดือนก่อน {formatBaht(Math.abs(cmp.expenseDiff))}
-                </b>
-                {pct && <span className="text-muted"> ({pct})</span>}
-              </>
-            )}
-          </p>
-          {(cmp.biggestIncrease || cmp.biggestDecrease) && (
-            <p className="text-ink-2">
-              {cmp.biggestIncrease && (
-                <>
-                  เพิ่มมากสุด <b className="text-ink">{name(cmp.biggestIncrease)}</b>{' '}
-                  <span className="num text-expense">+{formatBaht(cmp.biggestIncrease.diff)}</span>
-                </>
-              )}
-              {cmp.biggestIncrease && cmp.biggestDecrease && <span className="text-muted"> · </span>}
-              {cmp.biggestDecrease && (
-                <>
-                  ลดมากสุด <b className="text-ink">{name(cmp.biggestDecrease)}</b>{' '}
-                  <span className="num text-income">−{formatBaht(-cmp.biggestDecrease.diff)}</span>
-                </>
-              )}
-            </p>
-          )}
-        </div>
-      </div>
-    </section>
-  )
-}
-
-/** งบประมาณของเดือนปัจจุบัน: ใช้ไปกี่ % เหลือเท่าไหร่ ควรใช้วันละเท่าไหร่ */
-function BudgetCard({ data, onNavigate }: { data: AppData; onNavigate: (tab: Tab) => void }) {
-  const summary = useMemo(() => budgetSummary(data.categories, data.transactions, todayISO()), [data])
-  const hasExpenseCats = data.categories.some((c) => c.type === 'expense')
-  if (summary.items.length === 0) {
-    if (!hasExpenseCats) return null
-    return (
-      <section className="card flex flex-col lg:col-span-6">
-        <CardHeader title="งบประมาณเดือนนี้" />
-        <div className="px-5 pb-5 text-sm text-ink-2">
-          ยังไม่ได้ตั้งงบ ไปที่ตั้งค่า → แตะหมวดรายจ่าย → ใส่ “งบต่อเดือน” แล้วที่นี่จะบอกว่าใช้ไปเท่าไหร่ เหลือใช้ได้วันละเท่าไหร่
-          <div className="mt-3">
-            <button className="btn-secondary min-h-9 px-3 text-sm" onClick={() => onNavigate('settings')}>
-              ตั้งงบประมาณ
-            </button>
-          </div>
-        </div>
-      </section>
-    )
-  }
-
-  const totalRatio = summary.totalBudget ? summary.totalSpent / summary.totalBudget : 0
-  const totalLeft = summary.totalBudget - summary.totalSpent
-  return (
-    <section className="card lg:col-span-6">
-      <CardHeader
-        title="งบประมาณเดือนนี้"
-        subtitle={`เหลืออีก ${summary.daysLeft} วัน · ${totalLeft >= 0 ? `เหลือ ${formatBaht(totalLeft)}` : `เกินงบ ${formatBaht(-totalLeft)}`}`}
-      />
-      <div className="px-5 pb-5">
-        <div className="mb-4">
-          <div className="flex justify-between text-sm">
-            <span className="font-medium">รวมทุกหมวด</span>
-            <span className="num">
-              {formatBaht(summary.totalSpent)} <span className="text-muted">/ {formatBaht(summary.totalBudget)}</span>
-            </span>
-          </div>
-          <BudgetBar ratio={totalRatio} />
-        </div>
-        <ul className="space-y-3.5">
-          {summary.items.map((b) => (
-            <li key={b.category.id}>
-              <div className="flex items-center justify-between gap-3 text-sm">
-                <span className="flex min-w-0 items-center gap-2">
-                  <CategoryIcon category={b.category} size="sm" />
-                  <span className="truncate">{b.category.name}</span>
-                </span>
-                <span className={`num shrink-0 ${b.remaining < 0 ? 'font-semibold text-expense' : ''}`}>
-                  {b.remaining < 0 ? `เกิน ${formatBaht(-b.remaining)}` : `เหลือ ${formatBaht(b.remaining)}`}
-                </span>
-              </div>
-              <BudgetBar ratio={b.ratio} />
-              <div className="mt-1 flex justify-between text-xs text-muted">
-                <span className="num">
-                  {formatBaht(b.spent)} / {formatBaht(b.budget)} ({Math.round(b.ratio * 100)}%)
-                </span>
-                {b.perDay !== null && <span className="num">ใช้ได้วันละ {formatBaht(b.perDay)}</span>}
-              </div>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </section>
-  )
-}
-
-function BudgetBar({ ratio }: { ratio: number }) {
-  const tone = ratio >= 1 ? 'bg-expense' : ratio >= 0.8 ? 'bg-amber-500' : 'bg-chart'
-  return (
-    <div className="mt-1.5 h-2 rounded-full bg-chart-track" aria-hidden>
-      <div className={`h-2 rounded-full ${tone}`} style={{ width: `${Math.min(100, Math.max(1.5, ratio * 100))}%` }} />
-    </div>
-  )
-}
-
-/** แถบเตือนให้สำรองข้อมูล เมื่อไม่เคยสำรองหรือสำรองนานแล้ว */
+/** แถบเตือนให้สำรองข้อมูล เมื่อไม่เคยสำรองหรือสำรองนานแล้ว (บรรทัดเดียว ไม่แย่งความสนใจ) */
 function BackupBanner({ data }: { data: AppData }) {
   const toast = useToast()
   const [tick, setTick] = useState(0)
@@ -299,17 +106,15 @@ function BackupBanner({ data }: { data: AppData }) {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl border border-brand/30 bg-brand-soft/60 px-4 py-3 text-sm lg:col-span-12">
-      <span className="flex items-center gap-2 text-ink">
-        <HardDrive size={18} className="shrink-0 text-brand" aria-hidden />
-        {reminder.reason === 'never'
-          ? `มี ${data.transactions.length} รายการแล้ว แต่ยังไม่เคยสำรองข้อมูล ถ้าเครื่องหายหรือล้างเบราว์เซอร์ ข้อมูลจะหายทั้งหมด`
-          : `สำรองข้อมูลล่าสุดเมื่อ ${reminder.days} วันก่อน และมีรายการใหม่หลังจากนั้น`}
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl bg-sun-soft px-4 py-2.5 text-sm lg:col-span-12">
+      <HardDrive size={17} className="shrink-0 text-ink-2" aria-hidden />
+      <span className="min-w-0 flex-1 text-ink-2">
+        {reminder.reason === 'never' ? `ยังไม่เคยสำรองข้อมูล (${data.transactions.length} รายการ)` : `สำรองล่าสุด ${reminder.days} วันก่อน มีรายการใหม่หลังจากนั้น`}
       </span>
-      <span className="ml-auto flex gap-2">
+      <span className="flex gap-1">
         <button
           type="button"
-          className="btn-ghost min-h-9 px-3 text-sm"
+          className="btn-ghost min-h-8 px-2.5 text-xs"
           onClick={() => {
             snoozeBackupReminder()
             setTick((t) => t + 1)
@@ -317,19 +122,19 @@ function BackupBanner({ data }: { data: AppData }) {
         >
           ไว้ก่อน
         </button>
-        <button type="button" className="btn-primary min-h-9 px-3 text-sm" onClick={download}>
-          <Download size={16} aria-hidden /> สำรองตอนนี้
+        <button type="button" className="btn-primary min-h-8 px-3 text-xs" onClick={download}>
+          <Download size={14} aria-hidden /> สำรอง
         </button>
       </span>
     </div>
   )
 }
 
-/** ปุ่มลัด: รายการที่จดบ่อย แตะเดียวบันทึกเลย (แก้ได้จากปุ่มบน toast) */
+/** ปุ่มลัด: รายการที่จดบ่อย แตะเดียวบันทึกเลย (แก้ได้จากปุ่มบน toast) แสดงไม่เกิน 4 อัน */
 function QuickAdds({ data, onOpen }: { data: AppData; onOpen: (t: Transaction) => void }) {
   const toast = useToast()
   const [busy, setBusy] = useState<string | null>(null)
-  const items = useMemo(() => suggestQuickAdds(data.transactions, { today: todayISO() }), [data.transactions])
+  const items = useMemo(() => suggestQuickAdds(data.transactions, { today: todayISO(), limit: 4 }), [data.transactions])
   const valid = items.filter((q) => data.walletMap.has(q.walletId))
   if (valid.length === 0) return null
 
@@ -361,9 +166,8 @@ function QuickAdds({ data, onOpen }: { data: AppData; onOpen: (t: Transaction) =
 
   return (
     <section aria-label="จดเร็ว" className="lg:col-span-12">
-      <div className="mb-2 flex items-center gap-1.5 px-1 text-sm font-medium text-ink-2">
-        <Zap size={16} className="text-brand" aria-hidden /> จดเร็ว
-        <span className="text-xs font-normal text-muted">· แตะเพื่อจดเป็นของวันนี้</span>
+      <div className="mb-2 flex items-center gap-1.5 px-1 text-xs font-medium text-muted">
+        <Zap size={14} aria-hidden /> จดเร็ว · แตะเพื่อจดเป็นของวันนี้
       </div>
       <ul className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0">
         {valid.map((q) => {
@@ -375,17 +179,14 @@ function QuickAdds({ data, onOpen }: { data: AppData; onOpen: (t: Transaction) =
                 type="button"
                 disabled={busy !== null}
                 onClick={() => add(q)}
-                className="card flex items-center gap-2.5 rounded-2xl py-2 pr-3.5 pl-2 text-left transition-colors hover:bg-sunken disabled:opacity-60"
+                className="flex items-center gap-2.5 rounded-full bg-surface py-1.5 pr-4 pl-1.5 text-left transition-colors hover:bg-sunken disabled:opacity-60"
               >
-                <CategoryIcon category={cat} size="sm" fallback={q.type === 'income' ? '+' : '−'} />
+                <CategoryIcon category={cat} size="sm" fallback={q.type === 'income' ? '+' : '−'} className="rounded-full!" />
                 <span className="min-w-0">
                   <span className="block max-w-36 truncate text-sm font-medium">{q.note || cat?.name}</span>
-                  <span className="block text-xs text-muted">
-                    <span className={`num ${q.type === 'income' ? 'text-income' : ''}`}>
-                      {q.type === 'income' ? '+' : '−'}
-                      {formatBaht(q.amount)}
-                    </span>{' '}
-                    · {wallet.name}
+                  <span className={`num block text-xs ${q.type === 'income' ? 'text-income' : 'text-muted'}`}>
+                    {q.type === 'income' ? '+' : '−'}
+                    {formatBaht(q.amount)} · {wallet.name}
                   </span>
                 </span>
               </button>
@@ -397,79 +198,123 @@ function QuickAdds({ data, onOpen }: { data: AppData; onOpen: (t: Transaction) =
   )
 }
 
-function StatTile({
-  label,
-  value,
-  icon,
-  tone,
-  hint,
-}: {
-  label: string
-  value: ReactNode
-  icon: ReactNode
-  tone: string
-  hint?: string
-}) {
+/** เดือนนี้ในการ์ดเดียว: จ่ายไปเท่าไหร่ (ตัวใหญ่) รับ สุทธิ และวันละเท่าไหร่ */
+function MonthCard({ data, onNavigate }: { data: AppData; onNavigate: (tab: Tab) => void }) {
+  const { sum, count, daysLeft, perDay, avgPerDay, budget } = useMemo(() => {
+    const today = todayISO()
+    const range = monthRange()
+    const loanIds = loanCategoryIds(data.categories)
+    const inRange = filterTransactions(data.transactions, { range }, data.categoryMap, data.walletMap)
+    const sum = summarize(inRange, undefined, loanIds)
+    const count = inRange.filter((t) => t.type !== 'transfer' && !(t.categoryId && loanIds.has(t.categoryId))).length
+    const dayOfMonth = Number(today.slice(8, 10))
+    const budget = budgetSummary(data.categories, data.transactions, today)
+    const left = budget.totalBudget - budget.totalSpent
+    return {
+      sum,
+      count,
+      daysLeft: budget.daysLeft,
+      avgPerDay: Math.round(sum.expense / dayOfMonth),
+      budget: budget.items.length > 0 ? budget : null,
+      perDay: budget.items.length > 0 && left > 0 ? Math.floor(left / budget.daysLeft) : null,
+    }
+  }, [data])
+
+  const ratio = budget && budget.totalBudget ? budget.totalSpent / budget.totalBudget : null
+
   return (
-    <div className="card h-full p-5">
-      <div className="flex items-center gap-2 text-sm text-ink-2">
-        <span className={`flex h-7 w-7 items-center justify-center rounded-lg ${tone}`} aria-hidden>
-          {icon}
-        </span>
-        {label}
+    <section className="card p-5 sm:p-6 lg:col-span-7">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-medium text-ink-2">รายจ่ายเดือนนี้</h2>
+          <div className="num mt-1 text-4xl font-semibold tracking-tight break-words sm:text-[2.75rem]">{formatBaht(sum.expense)}</div>
+          <p className="mt-1 text-xs text-muted">
+            {count} รายการ · เหลืออีก {daysLeft} วัน
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => onNavigate('stats')}
+          className="btn-secondary min-h-9 shrink-0 px-3 text-sm"
+        >
+          สถิติ <ChevronRight size={15} aria-hidden />
+        </button>
       </div>
-      <div className="num mt-3 text-2xl font-semibold tracking-tight break-all xl:text-[1.7rem]">{value}</div>
-      {hint && <div className="mt-0.5 text-xs text-muted">{hint}</div>}
-    </div>
+
+      {ratio !== null && budget && (
+        <div className="mt-5">
+          <div className="flex justify-between text-xs text-muted">
+            <span>งบเดือนนี้</span>
+            <span className="num">
+              {formatBaht(budget.totalSpent)} / {formatBaht(budget.totalBudget)}
+            </span>
+          </div>
+          <div className="mt-1.5 h-2 rounded-full bg-chart-track" aria-hidden>
+            <div
+              className={`h-2 rounded-full ${ratio >= 1 ? 'bg-expense' : ratio >= 0.8 ? 'bg-sun' : 'bg-chart'}`}
+              style={{ width: `${Math.min(100, Math.max(1.5, ratio * 100))}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      <dl className="mt-6 grid grid-cols-3 gap-3 border-t border-line pt-4">
+        <div>
+          <dt className="text-xs text-muted">รายรับ</dt>
+          <dd className="num mt-0.5 text-base font-semibold text-income">+{formatBaht(sum.income)}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-muted">สุทธิ</dt>
+          <dd className={`num mt-0.5 text-base font-semibold ${sum.net < 0 ? 'text-expense' : ''}`}>{formatBaht(sum.net, { sign: true })}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-muted">{perDay !== null ? 'ใช้ได้อีกวันละ' : 'เฉลี่ยวันละ'}</dt>
+          <dd className="num mt-0.5 text-base font-semibold">{formatBaht(perDay ?? avgPerDay)}</dd>
+        </div>
+      </dl>
+    </section>
   )
 }
 
-function CardHeader({ title, subtitle, action }: { title: string; subtitle?: string; action?: ReactNode }) {
+/** รายจ่ายตามหมวดแบบย่อ: 4 หมวดแรก แถบบาง ๆ */
+function TopCategories({ data, onNavigate }: { data: AppData; onNavigate: (tab: Tab) => void }) {
+  const { slices, total } = useMemo(() => {
+    const loanIds = loanCategoryIds(data.categories)
+    const inRange = filterTransactions(data.transactions, { range: monthRange() }, data.categoryMap, data.walletMap)
+    const byCat = expenseByCategory(inRange, undefined, loanIds)
+    return { slices: categorySlices(byCat, data, 4), total: summarize(inRange, undefined, loanIds).expense }
+  }, [data])
+  if (slices.length === 0) return null
+  const max = slices[0].amount
+
   return (
-    <div className="flex items-start justify-between gap-3 px-5 pt-4 pb-3">
-      <div>
-        <h2 className="card-title">{title}</h2>
-        {subtitle && <p className="text-xs text-muted">{subtitle}</p>}
-      </div>
-      {action}
-    </div>
+    <section className="card lg:col-span-5">
+      <CardHeader
+        title="จ่ายไปกับอะไร"
+        subtitle="เดือนนี้"
+        action={
+          <button className="-mr-2 inline-flex items-center gap-0.5 rounded-lg px-2 py-1 text-sm font-medium text-ink-2 hover:bg-sunken" onClick={() => onNavigate('stats')}>
+            ทั้งหมด <ChevronRight size={16} aria-hidden />
+          </button>
+        }
+      />
+      <ul className="space-y-3 px-5 pb-5">
+        {slices.map((s) => (
+          <li key={s.key}>
+            <div className="flex items-center gap-2.5 text-sm">
+              <CategoryIcon category={s.cat} size="sm" fallback="⋯" />
+              <span className="min-w-0 flex-1 truncate">{s.name}</span>
+              <span className="num font-medium">{formatBaht(s.amount)}</span>
+              <span className="num w-9 text-right text-xs text-muted">{Math.round((s.amount / total) * 100)}%</span>
+            </div>
+            <div className="mt-1.5 ml-9.5 h-1.5 rounded-full bg-chart-track" aria-hidden>
+              <div className="h-1.5 rounded-full" style={{ width: `${Math.max(2, (s.amount / max) * 100)}%`, background: s.color }} />
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
   )
-}
-
-/** ช่วงของกราฟรายวัน: ใช้ช่วงที่เลือกถ้าอยู่ระหว่าง 2–62 วัน ไม่งั้นแสดง 30 วันล่าสุด */
-function chartRange(range: Partial<DateRange> | undefined): DateRange {
-  if (range?.from && range.to && range.from !== range.to) {
-    const days = (Date.parse(range.to) - Date.parse(range.from)) / 86_400_000
-    if (days <= 62) return { from: range.from, to: range.to }
-  }
-  const from = new Date()
-  from.setDate(from.getDate() - 29)
-  return { from: toISODate(from), to: todayISO() }
-}
-
-/** วงแหวนรายจ่ายตามหมวด: ใช้สีของหมวดแต่ละหมวด (ไม่เกิน 5 หมวด ที่เหลือรวมเป็น "อื่น ๆ") */
-const RING_LIMIT = 5
-const OTHER_COLOR = '#9a9aa6'
-function ringSlices(byCat: { categoryId: string | null; amount: number }[], data: AppData) {
-  const top = byCat.slice(0, RING_LIMIT).map((c) => {
-    const cat = c.categoryId ? data.categoryMap.get(c.categoryId) : undefined
-    return { key: c.categoryId ?? 'none', name: cat?.name ?? 'ไม่ระบุหมวด', color: cat?.color ?? OTHER_COLOR, amount: c.amount }
-  })
-  const rest = byCat.slice(RING_LIMIT).reduce((s, c) => s + c.amount, 0)
-  if (rest > 0) top.push({ key: 'rest', name: `หมวดอื่น (${byCat.length - RING_LIMIT})`, color: OTHER_COLOR, amount: rest })
-  return top
-}
-function ringGradient(slices: { color: string; amount: number }[]) {
-  const total = slices.reduce((s, x) => s + x.amount, 0)
-  let cursor = 0
-  const stops = slices
-    .filter((s) => s.amount > 0)
-    .map((s) => {
-      const start = cursor
-      cursor += (s.amount / total) * 100
-      return `${s.color} ${start}% ${cursor}%`
-    })
-  return `conic-gradient(${stops.join(', ')})`
 }
 
 export function DashboardPage({
@@ -483,27 +328,7 @@ export function DashboardPage({
   onAddWallet: () => void
   onNavigate: (tab: Tab) => void
 }) {
-  const [rangeValue, setRangeValue] = useState(defaultRange('month'))
-  const range = resolveRange(rangeValue)
-
-  const { inRange, sum, byCat, recent, daily, loanIds } = useMemo(() => {
-    const r = resolveRange(rangeValue)
-    const loanIds = loanCategoryIds(data.categories)
-    const notLoan = (t: Transaction) => !t.categoryId || !loanIds.has(t.categoryId)
-    const inRange = filterTransactions(data.transactions, { range: r }, data.categoryMap, data.walletMap)
-    const daily = chartRange(r)
-    return {
-      inRange,
-      loanIds,
-      sum: summarize(inRange, undefined, loanIds),
-      byCat: expenseByCategory(inRange, undefined, loanIds),
-      recent: sortNewestFirst(inRange).slice(0, 6),
-      daily: {
-        range: daily,
-        txs: filterTransactions(data.transactions, { range: daily }, data.categoryMap, data.walletMap).filter(notLoan),
-      },
-    }
-  }, [data, rangeValue])
+  const recent = useMemo(() => sortNewestFirst(data.transactions).slice(0, 5), [data.transactions])
 
   if (data.wallets.length === 0) {
     return (
@@ -526,40 +351,29 @@ export function DashboardPage({
     )
   }
 
-  const count = inRange.filter((t) => t.type !== 'transfer' && !(t.categoryId && loanIds.has(t.categoryId))).length
-  const dailyIsSelected = daily.range.from === range?.from && daily.range.to === range?.to
-
   return (
     <>
-      <PageHeader
-        title="ภาพรวม"
-        subtitle={formatDateLong(todayISO())}
-        actions={<RangePicker value={rangeValue} onChange={setRangeValue} className="w-full sm:w-auto sm:justify-end" />}
-      />
+      <PageHeader title="ภาพรวม" subtitle={formatDateLong(todayISO())} />
 
       <div className="grid gap-4 lg:grid-cols-12 lg:gap-5">
         <BackupBanner data={data} />
         <DueRecurrings data={data} onOpen={onOpen} />
-        <QuickAdds data={data} onOpen={onOpen} />
 
         {/* ยอดคงเหลือรวม + กระเป๋า */}
-        <section className="hero-card relative overflow-hidden rounded-3xl p-5 sm:p-6 lg:col-span-5 lg:row-span-2">
+        <section className="hero-card relative overflow-hidden rounded-3xl p-5 sm:p-6 lg:col-span-5">
           <div className="flex items-center justify-between gap-3">
             <span className="inline-flex items-center gap-2 text-sm opacity-90">
               <Wallet size={18} aria-hidden /> ยอดคงเหลือรวม
             </span>
             <span className="rounded-full bg-white/18 px-3 py-1 text-xs">{data.wallets.length} กระเป๋า</span>
           </div>
-          <div className="num mt-6 text-4xl font-semibold tracking-tight break-words sm:text-5xl lg:mt-8">{formatBaht(data.total)}</div>
+          <div className="num mt-5 text-4xl font-semibold tracking-tight break-words sm:text-[2.75rem]">{formatBaht(data.total)}</div>
 
-          <ul className="no-scrollbar -mx-5 mt-6 flex gap-2 overflow-x-auto px-5 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 lg:mt-8 lg:block lg:space-y-2">
+          <ul className="mt-6 space-y-2">
             {data.wallets.map((w) => {
               const bal = data.balances.get(w.id) ?? 0
               return (
-                <li
-                  key={w.id}
-                  className="flex min-w-44 shrink-0 items-center gap-2.5 rounded-2xl bg-white/14 px-3 py-2.5 backdrop-blur-sm sm:min-w-0"
-                >
+                <li key={w.id} className="flex items-center gap-2.5 rounded-2xl bg-white/14 px-3 py-2.5">
                   <WalletIcon wallet={w} size="sm" />
                   <span className="min-w-0 flex-1 truncate text-sm">{w.name}</span>
                   <span className={`num shrink-0 text-sm font-semibold ${bal < 0 ? 'text-sun' : ''}`}>{formatBaht(bal)}</span>
@@ -570,114 +384,33 @@ export function DashboardPage({
           <button
             type="button"
             onClick={() => onNavigate('wallets')}
-            className="mt-5 inline-flex min-h-10 items-center gap-1.5 rounded-full bg-brand px-4 text-sm font-medium text-on-brand"
+            className="mt-4 inline-flex min-h-9 items-center gap-1 rounded-full bg-white/18 px-3.5 text-sm font-medium hover:bg-white/25"
           >
             จัดการกระเป๋า <ChevronRight size={15} aria-hidden />
           </button>
         </section>
 
-        {/* ตัวเลขสรุป */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:col-span-7 lg:gap-4">
-          <StatTile
-            label="รายรับ"
-            value={formatBaht(sum.income)}
-            tone="bg-income-soft text-income"
-            icon={<ArrowDownLeft size={16} strokeWidth={2.4} />}
-          />
-          <StatTile
-            label="รายจ่าย"
-            value={formatBaht(sum.expense)}
-            tone="bg-expense-soft text-expense"
-            icon={<ArrowUpRight size={16} strokeWidth={2.4} />}
-          />
-          <div className="col-span-2 sm:col-span-1">
-            <StatTile
-              label={sum.net < 0 ? 'สุทธิ (จ่ายเกิน)' : 'สุทธิ'}
-              value={<span className={sum.net < 0 ? 'text-expense' : ''}>{formatBaht(sum.net, { sign: true })}</span>}
-              tone="bg-sunken text-ink-2"
-              icon={<Scale size={16} strokeWidth={2.2} />}
-              hint={`${count} รายการรับ-จ่าย`}
-            />
-          </div>
-        </div>
+        <MonthCard data={data} onNavigate={onNavigate} />
 
-        {/* กราฟรายวัน */}
-        <section className="card lg:col-span-7">
-          <CardHeader
-            title="รายจ่ายรายวัน"
-            subtitle={dailyIsSelected ? rangeLabel(daily.range) : `30 วันล่าสุด · ${rangeLabel(daily.range)}`}
-          />
-          <div className="px-5 pt-3 pb-5">
-            <DailyExpenseChart transactions={daily.txs} range={daily.range} />
-          </div>
-        </section>
+        <QuickAdds data={data} onOpen={onOpen} />
 
-        {/* รายจ่ายตามหมวด: การ์ดเข้ม วงแหวนสีตามหมวด */}
-        <section className="deep-card card lg:col-span-6">
-          <CardHeader title="รายจ่ายตามหมวด" subtitle={rangeLabel(range)} />
-          {byCat.length === 0 ? (
-            <p className="px-5 pb-6 text-sm text-muted">ไม่มีรายจ่ายในช่วงนี้</p>
-          ) : (
-            (() => {
-              const slices = ringSlices(byCat, data)
-              return (
-                <div className="flex flex-col items-center gap-6 px-5 pt-2 pb-6 sm:flex-row">
-                  <div
-                    className="grid h-44 w-44 shrink-0 place-items-center rounded-full"
-                    role="img"
-                    aria-label={`รายจ่ายรวม ${formatBaht(sum.expense)}`}
-                    style={{ background: ringGradient(slices) }}
-                  >
-                    <div className="flex h-32 w-32 flex-col items-center justify-center rounded-full bg-deep">
-                      <span className="text-xs text-muted">รายจ่ายรวม</span>
-                      <span className="num mt-1 text-lg font-semibold">{formatBaht(sum.expense)}</span>
-                    </div>
-                  </div>
-                  <ul className="grid w-full min-w-0 grid-cols-2 gap-x-4 gap-y-3.5">
-                    {slices.map((s) => (
-                      <li key={s.key} className="min-w-0">
-                        <div className="flex items-center gap-1.5 text-xs text-muted">
-                          <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: s.color }} aria-hidden />
-                          <span className="truncate">{s.name}</span>
-                        </div>
-                        <div className="num mt-0.5 text-sm font-medium">
-                          {formatBaht(s.amount)}
-                          <span className="ml-1 text-xs font-normal text-muted">{Math.round((s.amount / sum.expense) * 100)}%</span>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )
-            })()
-          )}
-        </section>
-
-        {/* เทียบเดือนต่อเดือน */}
-        <TrendCard data={data} />
-
-        {/* งบประมาณเดือนนี้ */}
-        <BudgetCard data={data} onNavigate={onNavigate} />
-
-        {/* เงินยืม */}
-        <LoanCard data={data} />
+        <TopCategories data={data} onNavigate={onNavigate} />
 
         {/* รายการล่าสุด */}
-        <section className="card overflow-hidden lg:col-span-12">
+        <section className="card overflow-hidden lg:col-span-7">
           <CardHeader
             title="รายการล่าสุด"
-            subtitle={rangeLabel(range)}
             action={
               <button
-                className="-mr-2 inline-flex items-center gap-0.5 rounded-lg px-2 py-1 text-sm font-medium text-brand hover:bg-brand-soft"
+                className="-mr-2 inline-flex items-center gap-0.5 rounded-lg px-2 py-1 text-sm font-medium text-ink-2 hover:bg-sunken"
                 onClick={() => onNavigate('history')}
               >
-                ดูทั้งหมด <ChevronRight size={16} aria-hidden />
+                ทั้งหมด <ChevronRight size={16} aria-hidden />
               </button>
             }
           />
           {recent.length === 0 ? (
-            <EmptyState icon={ReceiptText} title="ยังไม่มีรายการในช่วงนี้">
+            <EmptyState icon={ReceiptText} title="ยังไม่มีรายการ">
               กดปุ่ม + เพื่อจดรายการแรก
             </EmptyState>
           ) : (
