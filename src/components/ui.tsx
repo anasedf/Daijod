@@ -57,7 +57,7 @@ export function Sheet({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={`anim-sheet sm:anim-pop relative flex max-h-[94dvh] w-full flex-col overflow-hidden rounded-t-3xl bg-surface shadow-2xl outline-none sm:max-h-[88dvh] sm:rounded-2xl ${
+        className={`anim-sheet sm:anim-pop relative flex max-h-[94dvh] w-full flex-col overflow-hidden rounded-t-3xl bg-surface shadow-2xl outline-none sm:max-h-[88dvh] sm:rounded-3xl ${
           size === 'xl' ? 'sm:max-w-4xl' : size === 'lg' ? 'sm:max-w-xl' : 'sm:max-w-md'
         }`}
       >
@@ -94,8 +94,8 @@ export function PageHeader({
   return (
     <header className="mb-5 flex flex-wrap items-end justify-between gap-x-6 gap-y-3 lg:mb-8">
       <div className="min-w-0">
-        <h1 className="text-2xl font-bold tracking-tight lg:text-3xl">{title}</h1>
-        {subtitle && <p className="mt-0.5 text-sm text-muted">{subtitle}</p>}
+        <h1 className="text-3xl font-semibold tracking-tight lg:text-4xl">{title}</h1>
+        {subtitle && <p className="mt-2 text-sm text-muted">{subtitle}</p>}
       </div>
       {actions && <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">{actions}</div>}
     </header>

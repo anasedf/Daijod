@@ -1,7 +1,7 @@
 import { ArrowDownLeft, ArrowUpRight, ChevronRight, Download, HardDrive, ReceiptText, Scale, Wallet, Zap } from 'lucide-react'
 import { useMemo, useState, type ReactNode } from 'react'
 import type { Tab } from '../App'
-import { CategoryBars, DailyExpenseChart, MonthlyChart } from '../components/Charts'
+import { DailyExpenseChart, MonthlyChart } from '../components/Charts'
 import { defaultRange, RangePicker, rangeLabel, resolveRange } from '../components/RangePicker'
 import { TransactionList } from '../components/TransactionList'
 import { CategoryIcon, EmptyState, errorMessage, PageHeader, useToast, WalletIcon } from '../components/ui'
@@ -107,7 +107,7 @@ function LoanCard({ data }: { data: AppData }) {
     : [totalIn > 0 && `เขาติดเรา ${formatBaht(totalIn)}`, totalOut > 0 && `เราติดเขา ${formatBaht(totalOut)}`].filter(Boolean).join(' · ')
 
   return (
-    <section className="card lg:col-span-7">
+    <section className="card lg:col-span-6">
       <CardHeader title="เงินยืม" subtitle={subtitle} />
       <div className="grid gap-5 px-5 pb-5 sm:grid-cols-2">
         <LoanList title="เขาติดเรา" items={owedToMe} pick={(b) => b.owedToMe} tone="text-income" />
@@ -165,7 +165,7 @@ function TrendCard({ data }: { data: AppData }) {
   const name = (c: typeof cmp.biggestIncrease) => c?.category?.name ?? 'ไม่ระบุหมวด'
 
   return (
-    <section className="card lg:col-span-7">
+    <section className="card lg:col-span-6">
       <CardHeader title="6 เดือนย้อนหลัง" subtitle={`${monthLabel(months[0].month, true)} – ${monthLabel(months.at(-1)!.month, true)}`} />
       <div className="px-5 pt-3 pb-5">
         <MonthlyChart months={months} />
@@ -213,7 +213,7 @@ function BudgetCard({ data, onNavigate }: { data: AppData; onNavigate: (tab: Tab
   if (summary.items.length === 0) {
     if (!hasExpenseCats) return null
     return (
-      <section className="card flex flex-col lg:col-span-5">
+      <section className="card flex flex-col lg:col-span-6">
         <CardHeader title="งบประมาณเดือนนี้" />
         <div className="px-5 pb-5 text-sm text-ink-2">
           ยังไม่ได้ตั้งงบ ไปที่ตั้งค่า → แตะหมวดรายจ่าย → ใส่ “งบต่อเดือน” แล้วที่นี่จะบอกว่าใช้ไปเท่าไหร่ เหลือใช้ได้วันละเท่าไหร่
@@ -230,7 +230,7 @@ function BudgetCard({ data, onNavigate }: { data: AppData; onNavigate: (tab: Tab
   const totalRatio = summary.totalBudget ? summary.totalSpent / summary.totalBudget : 0
   const totalLeft = summary.totalBudget - summary.totalSpent
   return (
-    <section className="card lg:col-span-5">
+    <section className="card lg:col-span-6">
       <CardHeader
         title="งบประมาณเดือนนี้"
         subtitle={`เหลืออีก ${summary.daysLeft} วัน · ${totalLeft >= 0 ? `เหลือ ${formatBaht(totalLeft)}` : `เกินงบ ${formatBaht(-totalLeft)}`}`}
@@ -375,7 +375,7 @@ function QuickAdds({ data, onOpen }: { data: AppData; onOpen: (t: Transaction) =
                 type="button"
                 disabled={busy !== null}
                 onClick={() => add(q)}
-                className="card flex items-center gap-2.5 py-2 pr-3.5 pl-2 text-left transition-colors hover:border-brand/40 hover:bg-sunken disabled:opacity-60"
+                className="card flex items-center gap-2.5 rounded-2xl py-2 pr-3.5 pl-2 text-left transition-colors hover:bg-sunken disabled:opacity-60"
               >
                 <CategoryIcon category={cat} size="sm" fallback={q.type === 'income' ? '+' : '−'} />
                 <span className="min-w-0">
@@ -411,14 +411,14 @@ function StatTile({
   hint?: string
 }) {
   return (
-    <div className="card p-4">
+    <div className="card h-full p-5">
       <div className="flex items-center gap-2 text-sm text-ink-2">
         <span className={`flex h-7 w-7 items-center justify-center rounded-lg ${tone}`} aria-hidden>
           {icon}
         </span>
         {label}
       </div>
-      <div className="num mt-3 text-xl font-bold tracking-tight break-all lg:text-2xl">{value}</div>
+      <div className="num mt-3 text-2xl font-semibold tracking-tight break-all xl:text-[1.7rem]">{value}</div>
       {hint && <div className="mt-0.5 text-xs text-muted">{hint}</div>}
     </div>
   )
@@ -445,6 +445,31 @@ function chartRange(range: Partial<DateRange> | undefined): DateRange {
   const from = new Date()
   from.setDate(from.getDate() - 29)
   return { from: toISODate(from), to: todayISO() }
+}
+
+/** วงแหวนรายจ่ายตามหมวด: ใช้สีของหมวดแต่ละหมวด (ไม่เกิน 5 หมวด ที่เหลือรวมเป็น "อื่น ๆ") */
+const RING_LIMIT = 5
+const OTHER_COLOR = '#9a9aa6'
+function ringSlices(byCat: { categoryId: string | null; amount: number }[], data: AppData) {
+  const top = byCat.slice(0, RING_LIMIT).map((c) => {
+    const cat = c.categoryId ? data.categoryMap.get(c.categoryId) : undefined
+    return { key: c.categoryId ?? 'none', name: cat?.name ?? 'ไม่ระบุหมวด', color: cat?.color ?? OTHER_COLOR, amount: c.amount }
+  })
+  const rest = byCat.slice(RING_LIMIT).reduce((s, c) => s + c.amount, 0)
+  if (rest > 0) top.push({ key: 'rest', name: `หมวดอื่น (${byCat.length - RING_LIMIT})`, color: OTHER_COLOR, amount: rest })
+  return top
+}
+function ringGradient(slices: { color: string; amount: number }[]) {
+  const total = slices.reduce((s, x) => s + x.amount, 0)
+  let cursor = 0
+  const stops = slices
+    .filter((s) => s.amount > 0)
+    .map((s) => {
+      const start = cursor
+      cursor += (s.amount / total) * 100
+      return `${s.color} ${start}% ${cursor}%`
+    })
+  return `conic-gradient(${stops.join(', ')})`
 }
 
 export function DashboardPage({
@@ -517,40 +542,38 @@ export function DashboardPage({
         <DueRecurrings data={data} onOpen={onOpen} />
         <QuickAdds data={data} onOpen={onOpen} />
 
-        {/* ยอดรวม + กระเป๋า */}
-        <section className="relative overflow-hidden rounded-3xl bg-hero p-5 text-on-hero lg:col-span-5 lg:row-span-2 lg:p-6">
-          <div
-            className="pointer-events-none absolute -top-16 -right-16 h-56 w-56 rounded-full bg-brand/25 blur-3xl"
-            aria-hidden
-          />
-          <div className="relative">
-            <div className="text-sm opacity-75">ยอดคงเหลือรวม</div>
-            <div className="num mt-1 text-4xl font-bold tracking-tight lg:text-[2.75rem]">{formatBaht(data.total)}</div>
-            <div className="mt-1 text-xs opacity-60">{data.wallets.length} กระเป๋า</div>
-
-            <ul className="no-scrollbar -mx-5 mt-5 flex gap-2 overflow-x-auto px-5 lg:mx-0 lg:mt-6 lg:block lg:space-y-1 lg:overflow-visible lg:px-0">
-              {data.wallets.map((w) => {
-                const bal = data.balances.get(w.id) ?? 0
-                return (
-                  <li
-                    key={w.id}
-                    className="flex min-w-40 shrink-0 flex-col gap-2 rounded-2xl bg-white/8 p-3 lg:min-w-0 lg:flex-row lg:items-center lg:gap-3 lg:rounded-xl lg:bg-transparent lg:px-2 lg:py-2 lg:hover:bg-white/5"
-                  >
-                    <WalletIcon wallet={w} size="sm" />
-                    <span className="min-w-0 flex-1 truncate text-sm opacity-85">{w.name}</span>
-                    <span className={`num font-semibold ${bal < 0 ? 'text-expense' : ''}`}>{formatBaht(bal)}</span>
-                  </li>
-                )
-              })}
-            </ul>
-            <button
-              type="button"
-              onClick={() => onNavigate('wallets')}
-              className="mt-3 hidden items-center gap-1 rounded-lg px-2 py-1 text-sm opacity-75 hover:bg-white/5 hover:opacity-100 lg:inline-flex"
-            >
-              จัดการกระเป๋า <ChevronRight size={16} aria-hidden />
-            </button>
+        {/* ยอดคงเหลือรวม + กระเป๋า */}
+        <section className="hero-card relative overflow-hidden rounded-3xl p-5 sm:p-6 lg:col-span-5 lg:row-span-2">
+          <div className="flex items-center justify-between gap-3">
+            <span className="inline-flex items-center gap-2 text-sm opacity-90">
+              <Wallet size={18} aria-hidden /> ยอดคงเหลือรวม
+            </span>
+            <span className="rounded-full bg-white/18 px-3 py-1 text-xs">{data.wallets.length} กระเป๋า</span>
           </div>
+          <div className="num mt-6 text-4xl font-semibold tracking-tight break-words sm:text-5xl lg:mt-8">{formatBaht(data.total)}</div>
+
+          <ul className="no-scrollbar -mx-5 mt-6 flex gap-2 overflow-x-auto px-5 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 lg:mt-8 lg:block lg:space-y-2">
+            {data.wallets.map((w) => {
+              const bal = data.balances.get(w.id) ?? 0
+              return (
+                <li
+                  key={w.id}
+                  className="flex min-w-44 shrink-0 items-center gap-2.5 rounded-2xl bg-white/14 px-3 py-2.5 backdrop-blur-sm sm:min-w-0"
+                >
+                  <WalletIcon wallet={w} size="sm" />
+                  <span className="min-w-0 flex-1 truncate text-sm">{w.name}</span>
+                  <span className={`num shrink-0 text-sm font-semibold ${bal < 0 ? 'text-sun' : ''}`}>{formatBaht(bal)}</span>
+                </li>
+              )
+            })}
+          </ul>
+          <button
+            type="button"
+            onClick={() => onNavigate('wallets')}
+            className="mt-5 inline-flex min-h-10 items-center gap-1.5 rounded-full bg-brand px-4 text-sm font-medium text-on-brand"
+          >
+            จัดการกระเป๋า <ChevronRight size={15} aria-hidden />
+          </button>
         </section>
 
         {/* ตัวเลขสรุป */}
@@ -589,16 +612,45 @@ export function DashboardPage({
           </div>
         </section>
 
-        {/* หมวดหมู่ */}
-        <section className="card lg:col-span-5">
+        {/* รายจ่ายตามหมวด: การ์ดเข้ม วงแหวนสีตามหมวด */}
+        <section className="deep-card card lg:col-span-6">
           <CardHeader title="รายจ่ายตามหมวด" subtitle={rangeLabel(range)} />
-          <div className="px-5 pb-5">
-            {byCat.length === 0 ? (
-              <p className="py-6 text-center text-sm text-muted">ไม่มีรายจ่ายในช่วงนี้</p>
-            ) : (
-              <CategoryBars totals={byCat} total={sum.expense} data={data} />
-            )}
-          </div>
+          {byCat.length === 0 ? (
+            <p className="px-5 pb-6 text-sm text-muted">ไม่มีรายจ่ายในช่วงนี้</p>
+          ) : (
+            (() => {
+              const slices = ringSlices(byCat, data)
+              return (
+                <div className="flex flex-col items-center gap-6 px-5 pt-2 pb-6 sm:flex-row">
+                  <div
+                    className="grid h-44 w-44 shrink-0 place-items-center rounded-full"
+                    role="img"
+                    aria-label={`รายจ่ายรวม ${formatBaht(sum.expense)}`}
+                    style={{ background: ringGradient(slices) }}
+                  >
+                    <div className="flex h-32 w-32 flex-col items-center justify-center rounded-full bg-deep">
+                      <span className="text-xs text-muted">รายจ่ายรวม</span>
+                      <span className="num mt-1 text-lg font-semibold">{formatBaht(sum.expense)}</span>
+                    </div>
+                  </div>
+                  <ul className="grid w-full min-w-0 grid-cols-2 gap-x-4 gap-y-3.5">
+                    {slices.map((s) => (
+                      <li key={s.key} className="min-w-0">
+                        <div className="flex items-center gap-1.5 text-xs text-muted">
+                          <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: s.color }} aria-hidden />
+                          <span className="truncate">{s.name}</span>
+                        </div>
+                        <div className="num mt-0.5 text-sm font-medium">
+                          {formatBaht(s.amount)}
+                          <span className="ml-1 text-xs font-normal text-muted">{Math.round((s.amount / sum.expense) * 100)}%</span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )
+            })()
+          )}
         </section>
 
         {/* เทียบเดือนต่อเดือน */}

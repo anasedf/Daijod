@@ -1,4 +1,4 @@
-import { CheckSquare, FileUp, ReceiptText, Search, SearchX, Trash2, X } from 'lucide-react'
+import { CheckSquare, FileUp, ReceiptText, Search, SearchX, SlidersHorizontal, Trash2, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { ImportSheet } from '../components/ImportSheet'
 import { defaultRange, RangePicker, resolveRange } from '../components/RangePicker'
@@ -20,6 +20,7 @@ export function HistoryPage({ data, onOpen }: { data: AppData; onOpen: (t: Trans
   const [walletId, setWalletId] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [search, setSearch] = useState('')
+  const [showFilters, setShowFilters] = useState(false)
   const [importing, setImporting] = useState(false)
   // โหมดเลือกหลายรายการเพื่อลบ (null = ไม่ได้เลือก)
   const [selected, setSelected] = useState<Set<string> | null>(null)
@@ -108,10 +109,22 @@ export function HistoryPage({ data, onOpen }: { data: AppData; onOpen: (t: Trans
       />
       {importing && <ImportSheet data={data} onClose={() => setImporting(false)} />}
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-start lg:gap-5">
-        <div className="min-w-0 space-y-4">
+      <section className="card mb-6 overflow-hidden" aria-label="สรุปผลที่แสดง">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line/70 px-5 py-3">
+          <h2 className="card-title">สรุปผลที่แสดง</h2>
+          <span className="text-xs text-muted">ยอดรับ–จ่ายไม่นับการโอนและเงินยืม</span>
+        </div>
+        <dl className="history-summary">
+          <div><dt>จำนวนรายการ</dt><dd className="num">{results.length}<span className="ml-2 text-sm font-normal text-muted">รายการ</span></dd></div>
+          <div><dt>รายรับ</dt><dd className="num text-income">+{formatBaht(sum.income)}</dd></div>
+          <div><dt>รายจ่าย</dt><dd className="num text-expense">−{formatBaht(sum.expense)}</dd></div>
+          <div className="bg-brand-soft/40"><dt>สุทธิ</dt><dd className={`num ${sum.net < 0 ? 'text-expense' : 'text-brand'}`}>{formatBaht(sum.net, { sign: true })}</dd></div>
+        </dl>
+      </section>
+      <div className="card overflow-hidden">
+        <div className="min-w-0">
           {/* ค้นหา + ตัวกรอง */}
-          <div className="flex flex-col gap-2 md:flex-row">
+          <div className="grid gap-3 p-4 md:p-5 xl:grid-cols-[minmax(0,1fr)_auto]">
             <div className="relative flex-1">
               <Search size={18} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted" aria-hidden />
               <input
@@ -123,9 +136,10 @@ export function HistoryPage({ data, onOpen }: { data: AppData; onOpen: (t: Trans
                 aria-label="ค้นหา"
               />
             </div>
-            <div className="grid grid-cols-3 gap-2 md:flex">
+            <button type="button" className="btn-secondary sm:hidden" aria-expanded={showFilters} aria-controls="history-filters" onClick={() => setShowFilters(!showFilters)}><SlidersHorizontal size={16} aria-hidden /> ตัวกรอง{(type || walletId || categoryId) ? ' · ใช้งานอยู่' : ''}</button>
+            <div id="history-filters" className={`${showFilters ? 'grid' : 'hidden'} grid-cols-1 gap-2 sm:grid sm:grid-cols-3`}>
               <select
-                className="field text-sm md:w-32"
+                className="field text-sm xl:w-32"
                 aria-label="ประเภท"
                 value={type}
                 onChange={(e) => {
@@ -142,7 +156,7 @@ export function HistoryPage({ data, onOpen }: { data: AppData; onOpen: (t: Trans
                 ))}
               </select>
               <select
-                className="field text-sm md:w-36"
+                className="field text-sm xl:w-36"
                 aria-label="กระเป๋า"
                 value={walletId}
                 onChange={(e) => setWalletId(e.target.value)}
@@ -155,7 +169,7 @@ export function HistoryPage({ data, onOpen }: { data: AppData; onOpen: (t: Trans
                 ))}
               </select>
               <select
-                className="field text-sm md:w-36"
+                className="field text-sm xl:w-36"
                 aria-label="หมวดหมู่"
                 value={categoryId}
                 onChange={(e) => setCategoryId(e.target.value)}
@@ -172,28 +186,12 @@ export function HistoryPage({ data, onOpen }: { data: AppData; onOpen: (t: Trans
             </div>
           </div>
 
-          {/* สรุปผลบนมือถือ */}
-          <div className="flex items-center justify-between gap-3 text-sm lg:hidden">
-            <span className="text-ink-2">
-              <b className="font-semibold text-ink">{results.length}</b> รายการ
-              {results.length > 0 && (
-                <>
-                  <span className="text-muted"> · </span>
-                  <span className="num text-income">+{formatBaht(sum.income)}</span>
-                  <span className="text-muted"> · </span>
-                  <span className="num text-expense">−{formatBaht(sum.expense)}</span>
-                </>
-              )}
-            </span>
-            {filtered && (
-              <button className="inline-flex shrink-0 items-center gap-1 font-medium text-brand" onClick={reset}>
-                <X size={15} aria-hidden /> ล้างตัวกรอง
-              </button>
-            )}
+          <div className="flex items-center justify-between gap-3 border-t border-line/70 px-4 py-3 text-sm md:px-5">
+            <span className="text-ink-2">{filtered ? 'ผลการค้นหา' : 'รายการทั้งหมด'} <b className="num font-semibold text-ink">{results.length}</b> รายการ <span className="hidden text-muted sm:inline">· เรียงจากล่าสุด</span></span>
+            {filtered && <button className="inline-flex min-h-9 shrink-0 items-center gap-1 rounded-lg px-2 font-medium text-brand hover:bg-brand-soft" onClick={reset}><X size={15} aria-hidden /> ล้างตัวกรอง</button>}
           </div>
-
           {results.length === 0 ? (
-            <div className="card">
+            <div className="border-t border-line/70">
               {data.transactions.length === 0 ? (
                 <EmptyState icon={ReceiptText} title="ยังไม่มีรายการ">
                   กดปุ่ม + เพื่อเริ่มจด
@@ -211,40 +209,11 @@ export function HistoryPage({ data, onOpen }: { data: AppData; onOpen: (t: Trans
               )}
             </div>
           ) : (
-            <TransactionList transactions={results} data={data} onOpen={onOpen} selection={selection} />
+            <TransactionList transactions={results} data={data} onOpen={onOpen} selection={selection} flat />
           )}
         </div>
 
-        {/* สรุปผลบนจอใหญ่ */}
-        <aside className="card sticky top-8 hidden p-5 lg:block">
-          <h2 className="card-title">สรุปผลที่แสดง</h2>
-          <dl className="mt-4 space-y-3 text-sm">
-            <div className="flex justify-between">
-              <dt className="text-ink-2">จำนวน</dt>
-              <dd className="num font-medium">{results.length} รายการ</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-ink-2">รายรับ</dt>
-              <dd className="num font-medium text-income">+{formatBaht(sum.income)}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-ink-2">รายจ่าย</dt>
-              <dd className="num font-medium text-expense">−{formatBaht(sum.expense)}</dd>
-            </div>
-            <div className="flex justify-between border-t border-line pt-3">
-              <dt className="font-medium">สุทธิ</dt>
-              <dd className={`num font-semibold ${sum.net < 0 ? 'text-expense' : ''}`}>
-                {formatBaht(sum.net, { sign: true })}
-              </dd>
-            </div>
-          </dl>
-          <p className="mt-3 text-xs text-muted">ไม่นับการโอนระหว่างกระเป๋าและเงินยืม</p>
-          {filtered && (
-            <button className="btn-secondary mt-4 w-full" onClick={reset}>
-              <X size={16} aria-hidden /> ล้างตัวกรอง
-            </button>
-          )}
-        </aside>
+
       </div>
 
       {/* แถบคำสั่งตอนเลือกหลายรายการ */}

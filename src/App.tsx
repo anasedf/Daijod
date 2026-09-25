@@ -1,9 +1,10 @@
-import { House, Plus, ReceiptText, Settings, Wallet, type LucideIcon } from 'lucide-react'
+import { House, MonitorSmartphone, Moon, Plus, ReceiptText, Settings, Sun, Wallet, type LucideIcon } from 'lucide-react'
 import { Component, useCallback, useEffect, useState, type ReactNode } from 'react'
 import { TransactionForm } from './components/TransactionForm'
 import { UIProvider } from './components/ui'
 import { WalletForm } from './components/WalletForm'
 import { useData } from './hooks/useData'
+import { getPref, setPref } from './lib/prefs'
 import { formatBaht } from './lib/money'
 import type { Transaction } from './lib/types'
 import { DashboardPage } from './pages/Dashboard'
@@ -12,6 +13,7 @@ import { SettingsPage } from './pages/Settings'
 import { WalletsPage } from './pages/Wallets'
 
 export type Tab = 'home' | 'history' | 'wallets' | 'settings'
+type Theme = 'system' | 'light' | 'dark'
 
 const TABS: { id: Tab; label: string; Icon: LucideIcon }[] = [
   { id: 'home', label: 'ภาพรวม', Icon: House },
@@ -35,6 +37,35 @@ function Logo() {
 
 function Shell() {
   const data = useData()
+  // ธีม: ตามเครื่อง (ค่าเริ่มต้น) / สว่าง / มืด กดปุ่มวนไปเรื่อย ๆ
+  const [theme, setTheme] = useState<Theme>(() => {
+    const t = getPref('theme')
+    return t === 'light' || t === 'dark' ? t : 'system'
+  })
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)')
+    const apply = () => {
+      document.documentElement.dataset.theme = theme === 'system' ? (mq.matches ? 'dark' : 'light') : theme
+    }
+    apply()
+    setPref('theme', theme)
+    mq.addEventListener('change', apply)
+    return () => mq.removeEventListener('change', apply)
+  }, [theme])
+  const nextTheme: Record<Theme, Theme> = { system: 'light', light: 'dark', dark: 'system' }
+  const themeLabel: Record<Theme, string> = { system: 'ธีมตามเครื่อง', light: 'ธีมสว่าง', dark: 'ธีมมืด' }
+  const ThemeIcon = theme === 'light' ? Sun : theme === 'dark' ? Moon : MonitorSmartphone
+  const themeToggle = (
+    <button
+      type="button"
+      className="icon-btn bg-surface lg:bg-transparent"
+      onClick={() => setTheme(nextTheme[theme])}
+      aria-label={`${themeLabel[theme]} (กดเพื่อเปลี่ยน)`}
+      title={themeLabel[theme]}
+    >
+      <ThemeIcon size={19} />
+    </button>
+  )
   const [tab, setTab] = useState<Tab>('home')
   const [editor, setEditor] = useState<Editor>(null)
   const close = useCallback(() => setEditor(null), [])
@@ -72,9 +103,10 @@ function Shell() {
   return (
     <div className="min-h-dvh lg:flex">
       {/* ---------- จอใหญ่: แถบด้านข้าง ---------- */}
-      <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r border-line bg-surface px-4 py-5 lg:flex">
-        <div className="px-2">
+      <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r border-line bg-surface px-5 py-7 lg:flex">
+        <div className="flex items-center justify-between px-2">
           <Logo />
+          {themeToggle}
         </div>
         <button type="button" onClick={addNew} disabled={!data} className="btn-primary mt-6 w-full justify-between">
           <span className="flex items-center gap-2">
@@ -93,8 +125,8 @@ function Shell() {
                   type="button"
                   onClick={() => setTab(id)}
                   aria-current={tab === id ? 'page' : undefined}
-                  className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-[0.95rem] font-medium transition-colors ${
-                    tab === id ? 'bg-brand-soft text-brand' : 'text-ink-2 hover:bg-sunken hover:text-ink'
+                  className={`flex w-full items-center gap-3 rounded-full px-4 py-3 text-[0.95rem] font-medium transition-colors ${
+                    tab === id ? 'bg-brand text-on-brand' : 'text-ink-2 hover:bg-sunken hover:text-ink'
                   }`}
                 >
                   <Icon size={20} strokeWidth={tab === id ? 2.4 : 2} aria-hidden />
@@ -105,16 +137,20 @@ function Shell() {
           </ul>
         </nav>
         {data && data.wallets.length > 0 && (
-          <div className="mt-auto rounded-2xl bg-sunken p-4">
-            <div className="text-xs font-medium text-muted">ยอดรวมทุกกระเป๋า</div>
-            <div className="num mt-1 text-xl font-bold">{formatBaht(data.total)}</div>
-            <div className="mt-1 text-xs text-muted">{data.wallets.length} กระเป๋า</div>
+          <div className="hero-card mt-auto rounded-3xl p-5">
+            <div className="text-xs font-medium opacity-80">ยอดรวมทุกกระเป๋า</div>
+            <div className="num mt-1 text-xl font-semibold">{formatBaht(data.total)}</div>
+            <div className="mt-1 text-xs opacity-70">{data.wallets.length} กระเป๋า</div>
           </div>
         )}
       </aside>
 
       {/* ---------- เนื้อหา ---------- */}
-      <main className="mx-auto w-full max-w-6xl min-w-0 px-4 pt-[max(env(safe-area-inset-top),1rem)] pb-32 sm:px-6 lg:px-10 lg:pt-8 lg:pb-12">
+      <main className="mx-auto w-full max-w-6xl min-w-0 px-4 pt-[max(env(safe-area-inset-top),1rem)] pb-28 sm:px-6 lg:px-10 lg:pt-8 lg:pb-12">
+        <div className="mb-5 flex items-center justify-between lg:hidden">
+          <Logo />
+          {themeToggle}
+        </div>
         {!data ? (
           <p className="py-20 text-center text-muted" role="status">
             กำลังโหลด…
@@ -136,11 +172,12 @@ function Shell() {
       </main>
 
       {/* ---------- มือถือ: แถบเมนูล่าง ---------- */}
+      {/* แถบติดขอบล่างเต็มความกว้าง ไม่ลอย ปุ่ม + อยู่ในแถวเดียวกัน */}
       <nav
-        className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-lg lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] lg:hidden"
         aria-label="เมนูหลัก"
       >
-        <ul className="mx-auto grid h-16 max-w-xl grid-cols-5 items-center">
+        <ul className="mx-auto grid h-[4.25rem] max-w-xl grid-cols-5 items-center">
           {[...TABS.slice(0, 2), null, ...TABS.slice(2)].map((t) =>
             t === null ? (
               <li key="add" className="flex justify-center">
@@ -149,9 +186,9 @@ function Shell() {
                   onClick={addNew}
                   disabled={!data}
                   aria-label={addLabel}
-                  className="-mt-7 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand text-on-brand shadow-lg shadow-brand/30 transition-transform active:scale-95"
+                  className="flex h-12 w-12 items-center justify-center rounded-full bg-brand text-on-brand transition-transform active:scale-95"
                 >
-                  <Plus size={28} strokeWidth={2.5} aria-hidden />
+                  <Plus size={26} strokeWidth={2.4} aria-hidden />
                 </button>
               </li>
             ) : (
@@ -160,11 +197,18 @@ function Shell() {
                   type="button"
                   onClick={() => setTab(t.id)}
                   aria-current={tab === t.id ? 'page' : undefined}
-                  className={`flex h-16 w-full flex-col items-center justify-center gap-1 text-[0.7rem] font-medium ${
-                    tab === t.id ? 'text-brand' : 'text-muted'
+                  className={`flex h-[4.25rem] w-full flex-col items-center justify-center gap-1 text-[0.68rem] font-medium ${
+                    tab === t.id ? 'text-ink' : 'text-muted'
                   }`}
                 >
-                  <t.Icon size={22} strokeWidth={tab === t.id ? 2.4 : 1.9} aria-hidden />
+                  <span
+                    className={`flex h-7 w-11 items-center justify-center rounded-full transition-colors ${
+                      tab === t.id ? 'bg-accent-soft text-accent-strong' : ''
+                    }`}
+                    aria-hidden
+                  >
+                    <t.Icon size={21} strokeWidth={tab === t.id ? 2.2 : 1.9} />
+                  </span>
                   {t.label}
                 </button>
               </li>
@@ -200,34 +244,10 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean
   }
 }
 
-/** filter ให้ไอคอนดูเหมือนวาดมือ: บิดเส้นเล็กน้อย + เส้นซ้อนบาง ๆ เยื้องออกไป (ใช้ผ่าน svg.lucide ใน index.css) */
-function DoodleFilter() {
-  return (
-    <svg width="0" height="0" className="absolute" aria-hidden>
-      <filter id="doodle" x="-20%" y="-20%" width="140%" height="140%">
-        <feTurbulence type="fractalNoise" baseFrequency="0.07" numOctaves="2" seed="4" result="n" />
-        <feDisplacementMap in="SourceGraphic" in2="n" scale="1.6" xChannelSelector="R" yChannelSelector="G" result="main" />
-        <feTurbulence type="fractalNoise" baseFrequency="0.09" numOctaves="2" seed="11" result="n2" />
-        <feDisplacementMap in="SourceGraphic" in2="n2" scale="2.2" xChannelSelector="R" yChannelSelector="G" result="ghost0" />
-        <feMorphology in="ghost0" operator="erode" radius="0.7" result="ghost1" />
-        <feOffset in="ghost1" dx="1.2" dy="1.2" result="ghost" />
-        <feComponentTransfer in="ghost" result="ghostFaded">
-          <feFuncA type="linear" slope="0.5" />
-        </feComponentTransfer>
-        <feMerge>
-          <feMergeNode in="ghostFaded" />
-          <feMergeNode in="main" />
-        </feMerge>
-      </filter>
-    </svg>
-  )
-}
-
 export default function App() {
   return (
     <ErrorBoundary>
       <UIProvider>
-        <DoodleFilter />
         <Shell />
       </UIProvider>
     </ErrorBoundary>

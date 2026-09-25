@@ -53,7 +53,7 @@ function TransactionRow({
         type="button"
         onClick={() => (selection ? selection.toggle(tx.id) : onOpen(tx))}
         aria-pressed={selection ? checked : undefined}
-        className={`grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3 text-left transition-colors md:grid-cols-[auto_minmax(0,1.3fr)_minmax(0,1fr)_auto] md:px-5 ${
+        className={`transaction-row w-full text-left transition-colors ${
           checked ? 'bg-brand-soft/60' : 'hover:bg-sunken/60'
         }`}
       >
@@ -86,8 +86,8 @@ function TransactionRow({
           )}
           <span className="truncate">{walletText}</span>
         </span>
-        <span className="text-right">
-          <span className={`num block font-semibold ${tx.type === 'transfer' ? 'text-ink-2' : meta.text}`}>
+        <span className="min-w-0 text-right">
+          <span className={`num block break-words font-semibold ${tx.type === 'transfer' ? 'text-ink-2' : meta.text}`}>
             {meta.sign}
             {formatBaht(tx.amount)}
           </span>
@@ -121,14 +121,17 @@ export function TransactionList({
   }
 
   return (
-    <div className={flat ? '' : 'space-y-4'}>
+    <div className={flat ? 'transaction-list' : 'transaction-list card overflow-hidden'}>
+      <div className="transaction-columns" aria-hidden="true">
+        <span /><span>รายการ / หมวดหมู่</span><span>กระเป๋า</span><span className="text-right">จำนวนเงิน</span>
+      </div>
       {groups.map((g) => {
         let net = 0
         for (const t of g.items) net += t.type === 'income' ? t.amount : t.type === 'expense' ? -t.amount : 0
         return (
-          <section key={g.date} className={flat ? '' : 'card overflow-hidden'}>
-            <h3 className="flex justify-between bg-sunken/50 px-4 py-2 text-xs font-semibold text-muted md:px-5">
-              <span>{dayHeading(g.date)}</span>
+          <section key={g.date} className="border-t border-line/70">
+            <h3 className="flex flex-wrap items-center justify-between gap-2 bg-sunken/50 px-4 py-2.5 text-xs font-medium text-ink-2 md:px-5">
+              <span>{dayHeading(g.date)} <span className="ml-2 text-muted">· {g.items.length} รายการ</span></span>
               {net !== 0 && <span className="num">{formatBaht(net, { sign: true })}</span>}
             </h3>
             <ul className="divide-y divide-line/70">

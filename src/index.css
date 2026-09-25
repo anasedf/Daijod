@@ -1,75 +1,104 @@
 @import "tailwindcss";
 @import "@fontsource-variable/anuphan";
 
-/* สีทั้งหมดเป็น token ตามหน้าที่ แล้วสลับค่าในโหมดมืดที่เดียว */
+/*
+  ระบบสี: ทุกสีเป็น token ตามหน้าที่ แล้วสลับค่าในโหมดมืดที่เดียว (App.tsx ตั้ง data-theme ให้ตามการเลือก/ตามเครื่อง)
+  - brand   = สีของปุ่มหลัก/สิ่งที่กดได้ (ดำเกือบสนิท แบบปุ่มเม็ดยาในงานอ้างอิง)
+  - accent  = สีเน้น (ม่วงลาเวนเดอร์) ใช้กับการ์ดยอดรวมและกราฟ
+  - sun     = เหลืองอ่อน ใช้ไฮไลต์เล็ก ๆ
+  - deep    = การ์ดพื้นเข้ม (วงแหวนรายจ่ายตามหมวด)
+*/
 @theme {
   --font-sans: "Anuphan Variable", system-ui, -apple-system, "Segoe UI", "Noto Sans Thai", sans-serif;
 
-  --color-canvas: #f4f3ef;
+  --color-canvas: #f3f2f7;
   --color-surface: #ffffff;
-  --color-sunken: #eeede8;
-  --color-line: #e3e1da;
-  --color-ink: #17171a;
-  --color-ink-2: #4f4e4a;
-  --color-muted: #85837b;
+  --color-sunken: #f4f3f8;
+  --color-line: #e7e6ee;
+  --color-ink: #16161a;
+  --color-ink-2: #55555e;
+  --color-muted: #86868f;
 
-  --color-brand: #0d7a5f;
-  --color-brand-strong: #0a634d;
-  --color-brand-soft: #e2f1eb;
+  --color-brand: #1d1d21;
+  --color-brand-strong: #35353b;
+  --color-brand-soft: #ecebf3;
   --color-on-brand: #ffffff;
 
-  --color-hero: #17231f;
-  --color-on-hero: #f3f7f5;
+  --color-accent: #8b78ec;
+  --color-accent-strong: #6f5bd8;
+  --color-accent-soft: #ebe7fb;
+  --color-sun: #ffcf7e;
+  --color-sun-soft: #fff1d6;
+  --color-mint: #bfe8cf;
 
-  --color-income: #12804d;
-  --color-income-soft: #e3f3ea;
-  --color-expense: #cf3f33;
-  --color-expense-soft: #fbe9e6;
-  --color-transfer: #2d6bcf;
-  --color-transfer-soft: #e6eefb;
+  --color-hero: #8b78ec;
+  --color-on-hero: #ffffff;
+  --color-deep: #1d1d21;
+  --color-on-deep: #ffffff;
+  --color-deep-muted: #a9a9b4;
+  --color-deep-line: #35353b;
 
-  --color-chart: #0d7a5f;
-  --color-chart-track: #ecebe5;
+  --color-income: #1f8a55;
+  --color-income-soft: #e2f4ea;
+  --color-expense: #d2513f;
+  --color-expense-soft: #fce9e5;
+  --color-transfer: #5b7cc4;
+  --color-transfer-soft: #e7eefb;
+
+  --color-chart: #8b78ec;
+  --color-chart-track: #ecebf2;
 }
 
 @layer base {
-  @media (prefers-color-scheme: dark) {
-    :root {
-      color-scheme: dark;
-      --color-canvas: #0f0f0e;
-      --color-surface: #1a1a18;
-      --color-sunken: #232320;
-      --color-line: #2e2d2a;
-      --color-ink: #f2f1ec;
-      --color-ink-2: #c4c2b9;
-      --color-muted: #8f8d84;
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --color-canvas: #0e0e11;
+    --color-surface: #18181c;
+    --color-sunken: #212126;
+    --color-line: #2c2c33;
+    --color-ink: #f2f2f5;
+    --color-ink-2: #c2c2cb;
+    --color-muted: #8b8b96;
 
-      --color-brand: #3cbf95;
-      --color-brand-strong: #5ad0a8;
-      --color-brand-soft: #16302a;
-      --color-on-brand: #07130f;
+    --color-brand: #f2f2f5;
+    --color-brand-strong: #ffffff;
+    --color-brand-soft: #26262d;
+    --color-on-brand: #16161a;
 
-      --color-hero: #13302a;
-      --color-on-hero: #eef7f3;
+    --color-accent: #a291ff;
+    --color-accent-strong: #b8aaff;
+    --color-accent-soft: #272238;
+    --color-sun: #e6b45e;
+    --color-sun-soft: #33291a;
+    --color-mint: #2f4a3b;
 
-      --color-income: #4cc68a;
-      --color-income-soft: #15291f;
-      --color-expense: #f2766a;
-      --color-expense-soft: #33191a;
-      --color-transfer: #6ea3f2;
-      --color-transfer-soft: #172336;
+    --color-hero: #6f5bd8;
+    --color-on-hero: #ffffff;
+    --color-deep: #26262b;
+    --color-on-deep: #ffffff;
+    --color-deep-muted: #a9a9b4;
+    --color-deep-line: #3a3a41;
 
-      --color-chart: #3cbf95;
-      --color-chart-track: #2a2a27;
-    }
+    --color-income: #4cc68a;
+    --color-income-soft: #16291f;
+    --color-expense: #f27b6c;
+    --color-expense-soft: #34191b;
+    --color-transfer: #7fa3f0;
+    --color-transfer-soft: #182338;
+
+    --color-chart: #a291ff;
+    --color-chart-track: #2a2a30;
   }
 
   html {
+    color-scheme: light;
     -webkit-tap-highlight-color: transparent;
-    font-feature-settings: "tnum" 0;
   }
   body {
     @apply bg-canvas font-sans text-ink antialiased;
+  }
+  fieldset {
+    min-width: 0;
   }
   button,
   [role="button"] {
@@ -79,14 +108,13 @@
     cursor: not-allowed;
   }
   :focus-visible {
-    @apply outline-2 outline-offset-2 outline-brand;
+    @apply outline-2 outline-offset-2 outline-accent;
   }
-  /* ไอคอนทั้งแอปเป็นลายเส้นมือวาด: เส้นหนา ปลายมน บิดเล็กน้อย (filter #doodle อยู่ใน App.tsx) */
+  /* ไอคอนเส้นบาง สะอาด ให้ตัวเลขเป็นพระเอก */
   svg.lucide {
-    stroke-width: 2.4;
+    stroke-width: 1.9;
     stroke-linecap: round;
     stroke-linejoin: round;
-    filter: url(#doodle);
   }
 }
 
@@ -95,7 +123,7 @@
   .btn-secondary,
   .btn-ghost,
   .btn-danger {
-    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 text-[0.95rem] font-semibold transition-colors disabled:opacity-50;
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-4 text-[0.95rem] font-semibold transition-colors disabled:opacity-50;
   }
   .btn-primary {
     @apply bg-brand text-on-brand hover:bg-brand-strong;
@@ -107,34 +135,119 @@
     @apply text-ink-2 hover:bg-sunken hover:text-ink;
   }
   .btn-danger {
-    @apply bg-expense text-white hover:opacity-90 dark:text-canvas;
+    @apply bg-expense text-white hover:opacity-90;
   }
   .icon-btn {
-    @apply inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-sunken hover:text-ink;
+    @apply inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-sunken hover:text-ink;
   }
   .field {
-    @apply block min-h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-muted focus:border-brand focus:ring-3 focus:ring-brand/20 focus:outline-none disabled:opacity-50;
+    @apply block min-h-11 w-full rounded-2xl border border-line bg-surface px-3.5 text-base text-ink placeholder:text-muted focus:border-accent focus:ring-3 focus:ring-accent/20 focus:outline-none disabled:opacity-50;
   }
   .label {
     @apply mb-1.5 block text-sm font-medium text-ink-2;
   }
   .card {
-    @apply rounded-2xl border border-line/70 bg-surface;
+    @apply rounded-3xl bg-surface;
   }
   .card-title {
-    @apply text-[0.95rem] font-semibold text-ink;
+    @apply text-base font-semibold text-ink;
   }
   .segmented {
-    @apply flex gap-1 rounded-xl bg-sunken p-1;
+    @apply flex gap-1 rounded-full bg-sunken p-1;
   }
   .segmented > button {
-    @apply min-h-9 flex-1 rounded-lg px-3 text-sm font-medium whitespace-nowrap text-ink-2 transition-colors hover:text-ink;
+    @apply min-h-9 flex-1 rounded-full px-3 text-sm font-medium whitespace-nowrap text-ink-2 transition-colors hover:text-ink;
   }
   .segmented > button[aria-checked="true"] {
-    @apply bg-surface text-ink shadow-sm;
+    @apply bg-brand text-on-brand;
   }
   .num {
     font-variant-numeric: tabular-nums;
+  }
+
+  /* การ์ดยอดคงเหลือ: ม่วงลาเวนเดอร์ไล่เฉด มีแสงนวลมุมขวาบน */
+  .hero-card {
+    background:
+      radial-gradient(120% 90% at 100% 0%, rgb(255 255 255 / 0.22), transparent 55%),
+      linear-gradient(150deg, var(--color-accent) 0%, var(--color-accent-strong) 100%);
+    @apply text-on-hero;
+  }
+  /* การ์ดพื้นเข้ม */
+  .deep-card {
+    @apply bg-deep text-on-deep;
+  }
+  .deep-card .card-title {
+    @apply text-on-deep;
+  }
+  .deep-card .text-muted,
+  .deep-card .text-ink-2 {
+    color: var(--color-deep-muted);
+  }
+
+  /* แถวรายการ: คอลัมน์เดียวกันทุกวัน ให้ตัวเลขตรงกัน */
+  .transaction-row {
+    display: grid;
+    grid-template-columns: 2.5rem minmax(0, 1fr) minmax(6.5rem, 9rem);
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
+  }
+  .transaction-columns {
+    display: none;
+  }
+  @media (min-width: 768px) {
+    .transaction-row,
+    .transaction-columns {
+      grid-template-columns: 2.5rem minmax(0, 1fr) minmax(7rem, 0.55fr) 10.5rem;
+      gap: 1rem;
+      padding-left: 1.25rem;
+      padding-right: 1.25rem;
+    }
+    .transaction-columns {
+      display: grid;
+      padding-top: 0.75rem;
+      padding-bottom: 0.75rem;
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--color-muted);
+    }
+  }
+
+  /* สรุปผลหน้ารายการ: 2 ช่องบนมือถือ 4 ช่องบนจอใหญ่ */
+  .history-summary {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .history-summary > div {
+    padding: 1.125rem 1.25rem;
+    border-color: var(--color-line);
+  }
+  .history-summary dt {
+    color: var(--color-ink-2);
+    font-size: 0.8125rem;
+  }
+  .history-summary dd {
+    margin-top: 0.375rem;
+    font-size: clamp(1.125rem, 2vw, 1.5rem);
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+  .history-summary > div:nth-child(even) {
+    border-left: 1px solid var(--color-line);
+  }
+  .history-summary > div:nth-child(n + 3) {
+    border-top: 1px solid var(--color-line);
+  }
+  @media (min-width: 768px) {
+    .history-summary {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+    .history-summary > div + div {
+      border-left: 1px solid var(--color-line);
+    }
+    .history-summary > div:nth-child(n + 3) {
+      border-top: 0;
+    }
   }
 }
 
