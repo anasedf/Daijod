@@ -1,3 +1,4 @@
+import { StickyNote } from 'lucide-react'
 import type { AppData } from '../hooks/useData'
 import { dayHeading } from '../lib/dates'
 import { TX_META } from '../lib/labels'
@@ -69,6 +70,12 @@ function TransactionRow({
             </span>
             {tx.note || <span className="hidden md:inline">—</span>}
           </span>
+          {tx.memo && (
+            <span className="flex items-center gap-1 text-xs text-muted" title={tx.memo}>
+              <StickyNote size={12} className="shrink-0" aria-hidden />
+              <span className="truncate">{tx.memo.split('\n')[0]}</span>
+            </span>
+          )}
         </span>
         <span className="hidden min-w-0 items-center gap-2 text-sm text-ink-2 md:flex">
           {tx.type !== 'transfer' && (

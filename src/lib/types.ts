@@ -21,7 +21,8 @@ export interface Transaction {
   amount: number // สตางค์ ต้องมากกว่า 0
   date: string // YYYY-MM-DD (วันที่ตามเวลาท้องถิ่น)
   categoryId?: string // ไม่ใช้กับการโอน
-  note: string
+  note: string // รายละเอียดสั้น ๆ (ชื่อร้าน/ชื่อคน) ใช้เป็นชื่อรายการ
+  memo?: string // โน้ตยาว ๆ หลายบรรทัดได้
   sourceWalletId?: string // รายจ่าย และ โอน
   destinationWalletId?: string // รายรับ และ โอน
   importKey?: string // รหัสรายการจาก statement ที่นำเข้า ใช้กันนำเข้าซ้ำ

@@ -39,6 +39,7 @@ export function normalizeTransaction(input: TransactionInput): TransactionInput 
   if (input.type !== 'income') out.sourceWalletId = input.sourceWalletId
   if (input.type !== 'expense') out.destinationWalletId = input.destinationWalletId
   if (input.importKey) out.importKey = input.importKey
+  if (input.memo?.trim()) out.memo = input.memo.trim()
   return out
 }
 
@@ -144,6 +145,7 @@ export function filterTransactions(
     if (q) {
       const haystack = [
         tx.note,
+        tx.memo ?? '',
         tx.categoryId ? categories.get(tx.categoryId)?.name : '',
         tx.sourceWalletId ? wallets.get(tx.sourceWalletId)?.name : '',
         tx.destinationWalletId ? wallets.get(tx.destinationWalletId)?.name : '',

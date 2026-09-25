@@ -75,6 +75,7 @@ export function TransactionForm({
   const [amount, setAmount] = useState(transaction ? amountToInput(transaction.amount) : '')
   const [date, setDate] = useState(transaction?.date ?? todayISO())
   const [note, setNote] = useState(transaction?.note ?? '')
+  const [memo, setMemo] = useState(transaction?.memo ?? '')
   const [categoryId, setCategoryId] = useState(transaction?.categoryId ?? '')
   const [source, setSource] = useState(transaction?.sourceWalletId ?? defaultWallet)
   const [dest, setDest] = useState(
@@ -111,6 +112,7 @@ export function TransactionForm({
       amount: value,
       date,
       note,
+      memo,
       categoryId: categoryId || undefined,
       sourceWalletId: source,
       destinationWalletId: dest,
@@ -300,6 +302,21 @@ export function TransactionForm({
               maxLength={200}
             />
           </div>
+        </div>
+
+        <div>
+          <label className="label" htmlFor="t-memo">
+            โน้ต <span className="font-normal text-muted">(ไม่บังคับ พิมพ์ได้หลายบรรทัด)</span>
+          </label>
+          <textarea
+            id="t-memo"
+            className="field min-h-20 resize-y py-2.5"
+            value={memo}
+            onChange={(e) => setMemo(e.target.value)}
+            placeholder="เช่น จ่ายแทนเพื่อนไปก่อน รอเก็บคืน"
+            maxLength={2000}
+            rows={3}
+          />
         </div>
 
         {error && <FormError>{error}</FormError>}
