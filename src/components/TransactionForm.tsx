@@ -151,6 +151,7 @@ export function TransactionForm({
 
 
   const meta = TX_META[type]
+  const loanRole = categoryId ? data.categoryMap.get(categoryId)?.role : undefined
 
   return (
     <Sheet
@@ -279,14 +280,23 @@ export function TransactionForm({
           </div>
           <div>
             <label className="label" htmlFor="t-note">
-              รายละเอียด <span className="font-normal text-muted">(ไม่บังคับ)</span>
+              {loanRole ? (
+                <>
+                  ชื่อคน <span className="font-normal text-muted">(ใช้จับคู่ตอนคืน/รับคืน)</span>
+                </>
+              ) : (
+                <>
+                  รายละเอียด <span className="font-normal text-muted">(ไม่บังคับ)</span>
+                </>
+              )}
             </label>
             <input
               id="t-note"
               className="field"
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="เช่น ข้าวกลางวัน"
+              placeholder={loanRole ? 'เช่น สมชาย' : 'เช่น ข้าวกลางวัน'}
+              required={!!loanRole}
               maxLength={200}
             />
           </div>

@@ -7,6 +7,7 @@ import { EmptyState, errorMessage, PageHeader, useConfirm, useToast } from '../c
 import type { AppData } from '../hooks/useData'
 import { deleteTransactions } from '../lib/db'
 import { TX_META } from '../lib/labels'
+import { loanCategoryIds } from '../lib/loans'
 import { filterTransactions, sortNewestFirst, summarize } from '../lib/ledger'
 import { formatBaht } from '../lib/money'
 import type { Transaction, TransactionType } from '../lib/types'
@@ -35,7 +36,7 @@ export function HistoryPage({ data, onOpen }: { data: AppData; onOpen: (t: Trans
       ),
     [data, range, type, walletId, categoryId, search],
   )
-  const sum = summarize(results)
+  const sum = useMemo(() => summarize(results, undefined, loanCategoryIds(data.categories)), [results, data.categories])
   const filtered = !!(type || walletId || categoryId || search.trim() || range.mode !== 'all')
   const catOptions = data.categories.filter((c) => !type || type === c.type)
 
@@ -237,7 +238,7 @@ export function HistoryPage({ data, onOpen }: { data: AppData; onOpen: (t: Trans
               </dd>
             </div>
           </dl>
-          <p className="mt-3 text-xs text-muted">ไม่นับการโอนระหว่างกระเป๋า</p>
+          <p className="mt-3 text-xs text-muted">ไม่นับการโอนระหว่างกระเป๋าและเงินยืม</p>
           {filtered && (
             <button className="btn-secondary mt-4 w-full" onClick={reset}>
               <X size={16} aria-hidden /> ล้างตัวกรอง

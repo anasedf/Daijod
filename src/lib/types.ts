@@ -39,7 +39,11 @@ export interface Category {
   iconName?: string // ชื่อไอคอนจากชุดใน lib/icons.ts
   color?: string
   budget?: number // งบต่อเดือน (สตางค์) ใช้กับหมวดรายจ่าย
+  role?: LoanRole // หมวดเงินยืม: ไม่นับเป็นรายรับ/รายจ่ายจริง ใช้ติดตามว่าใครติดใคร
 }
+
+/** lend = ให้เขายืม, repay = เขาคืนเรา, borrow = เรายืมเขา, payback = เราคืนเขา */
+export type LoanRole = 'lend' | 'repay' | 'borrow' | 'payback'
 
 /** รายการประจำ: ถึงวันที่กำหนดของทุกเดือน แอปจะถามให้บันทึกเป็นรายการจริง */
 export interface Recurring {

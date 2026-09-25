@@ -74,12 +74,16 @@ export interface PeriodSummary {
   net: number
 }
 
-/** สรุปรายรับ/รายจ่ายในช่วงวันที่ (การโอนไม่นับ เพราะเป็นการย้ายเงินของตัวเอง) */
-export function summarize(txs: Transaction[], range?: Partial<DateRange>): PeriodSummary {
+/**
+ * สรุปรายรับ/รายจ่ายในช่วงวันที่ (การโอนไม่นับ เพราะเป็นการย้ายเงินของตัวเอง)
+ * exclude = หมวดที่ไม่นับ เช่น หมวดเงินยืม
+ */
+export function summarize(txs: Transaction[], range?: Partial<DateRange>, exclude?: Set<string>): PeriodSummary {
   let income = 0
   let expense = 0
   for (const tx of txs) {
     if (!inRange(tx.date, range)) continue
+    if (exclude && tx.categoryId && exclude.has(tx.categoryId)) continue
     if (tx.type === 'income') income += tx.amount
     else if (tx.type === 'expense') expense += tx.amount
   }
@@ -92,10 +96,11 @@ export interface CategoryTotal {
 }
 
 /** รวมรายจ่ายตามหมวด เรียงจากมากไปน้อย */
-export function expenseByCategory(txs: Transaction[], range?: Partial<DateRange>): CategoryTotal[] {
+export function expenseByCategory(txs: Transaction[], range?: Partial<DateRange>, exclude?: Set<string>): CategoryTotal[] {
   const totals = new Map<string | null, number>()
   for (const tx of txs) {
     if (tx.type !== 'expense' || !inRange(tx.date, range)) continue
+    if (exclude && tx.categoryId && exclude.has(tx.categoryId)) continue
     const key = tx.categoryId ?? null
     totals.set(key, (totals.get(key) ?? 0) + tx.amount)
   }

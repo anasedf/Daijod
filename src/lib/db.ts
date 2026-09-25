@@ -31,6 +31,13 @@ export class DaijodDB extends Dexie {
       )
     // v3: รายการประจำ
     this.version(3).stores({ ...stores, recurring: 'id, active' })
+    // v4: หมวดเงินยืม เติมให้ฐานข้อมูลเก่าที่ยังไม่มี
+    this.version(4)
+      .stores({ ...stores, recurring: 'id, active' })
+      .upgrade(async (tx) => {
+        const t = tx.table('categories')
+        for (const c of DEFAULT_CATEGORIES) if (c.role && !(await t.get(c.id))) await t.add(c)
+      })
     this.on('populate', (tx) => {
       tx.table('categories').bulkAdd(DEFAULT_CATEGORIES)
     })
@@ -50,6 +57,11 @@ export const DEFAULT_CATEGORIES: Category[] = [
   { id: 'inc-extra', name: 'รายได้เสริม', type: 'income', icon: '💰', iconName: 'Coins', color: '#15803d' },
   { id: 'inc-gift', name: 'ได้รับ/ของขวัญ', type: 'income', icon: '🎁', iconName: 'Gift', color: '#be185d' },
   { id: 'inc-other', name: 'อื่น ๆ', type: 'income', icon: '📥', iconName: 'Inbox', color: '#475569' },
+  // หมวดเงินยืม (ไม่นับในสรุปรายรับ/รายจ่าย)
+  { id: 'exp-lend', name: 'ให้ยืม', type: 'expense', icon: '🤝', iconName: 'HandCoins', color: '#0369a1', role: 'lend' },
+  { id: 'exp-payback', name: 'จ่ายคืน', type: 'expense', icon: '↩️', iconName: 'Banknote', color: '#4d7c0f', role: 'payback' },
+  { id: 'inc-repay', name: 'ได้รับคืน', type: 'income', icon: '🤝', iconName: 'PiggyBank', color: '#0369a1', role: 'repay' },
+  { id: 'inc-borrow', name: 'ยืมมา', type: 'income', icon: '🏦', iconName: 'Landmark', color: '#4d7c0f', role: 'borrow' },
 ]
 
 export const db = new DaijodDB()

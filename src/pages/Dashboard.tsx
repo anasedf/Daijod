@@ -14,6 +14,7 @@ import { TX_META } from '../lib/labels'
 import { dueRecurrings } from '../lib/recurring'
 import { expenseByCategory, filterTransactions, sortNewestFirst, summarize } from '../lib/ledger'
 import { formatBaht } from '../lib/money'
+import { loanBalances, loanCategoryIds, type LoanBalance } from '../lib/loans'
 import { suggestQuickAdds, type QuickAdd } from '../lib/quick'
 import { compareMonths, monthLabel, monthlyTotals } from '../lib/trend'
 import type { Recurring, Transaction } from '../lib/types'
@@ -89,11 +90,73 @@ function DueRecurrings({ data, onOpen }: { data: AppData; onOpen: (t: Transactio
   )
 }
 
+/** เงินยืม: ใครติดเรา เราติดใคร (จากหมวดให้ยืม/ได้รับคืน/ยืมมา/จ่ายคืน ชื่อคนอยู่ในรายละเอียด) */
+function LoanCard({ data }: { data: AppData }) {
+  const balances = useMemo(() => loanBalances(data.transactions, data.categories), [data])
+  const hasLoanTx = useMemo(() => {
+    const ids = loanCategoryIds(data.categories)
+    return data.transactions.some((t) => t.categoryId && ids.has(t.categoryId))
+  }, [data])
+  if (!hasLoanTx) return null
+  const owedToMe = balances.filter((b) => b.owedToMe > 0)
+  const iOwe = balances.filter((b) => b.iOwe > 0)
+  const totalIn = owedToMe.reduce((s, b) => s + b.owedToMe, 0)
+  const totalOut = iOwe.reduce((s, b) => s + b.iOwe, 0)
+  const subtitle = balances.length === 0
+    ? 'เคลียร์หมดแล้ว'
+    : [totalIn > 0 && `เขาติดเรา ${formatBaht(totalIn)}`, totalOut > 0 && `เราติดเขา ${formatBaht(totalOut)}`].filter(Boolean).join(' · ')
+
+  return (
+    <section className="card lg:col-span-7">
+      <CardHeader title="เงินยืม" subtitle={subtitle} />
+      <div className="grid gap-5 px-5 pb-5 sm:grid-cols-2">
+        <LoanList title="เขาติดเรา" items={owedToMe} pick={(b) => b.owedToMe} tone="text-income" />
+        <LoanList title="เราติดเขา" items={iOwe} pick={(b) => b.iOwe} tone="text-expense" />
+      </div>
+      <p className="border-t border-line/70 px-5 py-2.5 text-xs text-muted">
+        จดด้วยหมวด ให้ยืม / ได้รับคืน / ยืมมา / จ่ายคืน แล้วใส่ชื่อคนในช่องรายละเอียด รายการเหล่านี้ไม่นับเป็นรายรับรายจ่าย
+      </p>
+    </section>
+  )
+}
+
+function LoanList({ title, items, pick, tone }: { title: string; items: LoanBalance[]; pick: (b: LoanBalance) => number; tone: string }) {
+  return (
+    <div>
+      <div className="mb-1.5 flex justify-between text-xs font-semibold text-muted">
+        <span>{title}</span>
+        <span className={`num ${tone}`}>{formatBaht(items.reduce((s, b) => s + pick(b), 0))}</span>
+      </div>
+      {items.length === 0 ? (
+        <p className="text-sm text-muted">ไม่มี</p>
+      ) : (
+        <ul className="divide-y divide-line/70">
+          {items.map((b) => (
+            <li key={b.name} className="flex items-center justify-between gap-3 py-1.5 text-sm">
+              <span className="min-w-0">
+                <span className="block truncate font-medium">{b.name}</span>
+                <span className="block text-xs text-muted">
+                  {b.count} รายการ · ล่าสุด {formatDateShort(b.lastDate)}
+                </span>
+              </span>
+              <span className={`num shrink-0 font-semibold ${tone}`}>{formatBaht(pick(b))}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
 /** 6 เดือนย้อนหลัง + เดือนนี้เทียบเดือนก่อน */
 function TrendCard({ data }: { data: AppData }) {
   const { months, cmp } = useMemo(() => {
     const today = todayISO()
-    return { months: monthlyTotals(data.transactions, today, 6), cmp: compareMonths(data.transactions, data.categoryMap, today) }
+    const ex = loanCategoryIds(data.categories)
+    return {
+      months: monthlyTotals(data.transactions, today, 6, ex),
+      cmp: compareMonths(data.transactions, data.categoryMap, today, ex),
+    }
   }, [data])
   if (months.every((m) => m.income === 0 && m.expense === 0)) return null
 
@@ -398,16 +461,22 @@ export function DashboardPage({
   const [rangeValue, setRangeValue] = useState(defaultRange('month'))
   const range = resolveRange(rangeValue)
 
-  const { inRange, sum, byCat, recent, daily } = useMemo(() => {
+  const { inRange, sum, byCat, recent, daily, loanIds } = useMemo(() => {
     const r = resolveRange(rangeValue)
+    const loanIds = loanCategoryIds(data.categories)
+    const notLoan = (t: Transaction) => !t.categoryId || !loanIds.has(t.categoryId)
     const inRange = filterTransactions(data.transactions, { range: r }, data.categoryMap, data.walletMap)
     const daily = chartRange(r)
     return {
       inRange,
-      sum: summarize(inRange),
-      byCat: expenseByCategory(inRange),
+      loanIds,
+      sum: summarize(inRange, undefined, loanIds),
+      byCat: expenseByCategory(inRange, undefined, loanIds),
       recent: sortNewestFirst(inRange).slice(0, 6),
-      daily: { range: daily, txs: filterTransactions(data.transactions, { range: daily }, data.categoryMap, data.walletMap) },
+      daily: {
+        range: daily,
+        txs: filterTransactions(data.transactions, { range: daily }, data.categoryMap, data.walletMap).filter(notLoan),
+      },
     }
   }, [data, rangeValue])
 
@@ -432,7 +501,7 @@ export function DashboardPage({
     )
   }
 
-  const count = inRange.filter((t) => t.type !== 'transfer').length
+  const count = inRange.filter((t) => t.type !== 'transfer' && !(t.categoryId && loanIds.has(t.categoryId))).length
   const dailyIsSelected = daily.range.from === range?.from && daily.range.to === range?.to
 
   return (
@@ -538,8 +607,11 @@ export function DashboardPage({
         {/* งบประมาณเดือนนี้ */}
         <BudgetCard data={data} onNavigate={onNavigate} />
 
+        {/* เงินยืม */}
+        <LoanCard data={data} />
+
         {/* รายการล่าสุด */}
-        <section className="card overflow-hidden lg:col-span-7">
+        <section className="card overflow-hidden lg:col-span-12">
           <CardHeader
             title="รายการล่าสุด"
             subtitle={rangeLabel(range)}
