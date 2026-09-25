@@ -39,7 +39,10 @@ function TransactionRow({
   const src = tx.sourceWalletId ? data.walletMap.get(tx.sourceWalletId) : undefined
   const dst = tx.destinationWalletId ? data.walletMap.get(tx.destinationWalletId) : undefined
 
-  const title = tx.type === 'transfer' ? 'โอนเงิน' : cat?.name ?? meta.label
+  // ชื่อรายการเป็นหลัก หมวดเป็นบรรทัดรอง (ไม่มีชื่อก็ใช้ชื่อหมวดเป็นหลักแทน)
+  const kindName = tx.type === 'transfer' ? 'โอนเงิน' : cat?.name ?? 'ไม่ระบุหมวด'
+  const title = tx.note || kindName
+  const sub = tx.note ? kindName : ''
   const walletText = tx.type === 'transfer' ? `${src?.name} → ${dst?.name}` : (tx.type === 'income' ? dst : src)?.name
   const walletColor = (tx.type === 'income' ? dst : src)?.color
   const checked = selection?.selected.has(tx.id) ?? false
@@ -66,9 +69,9 @@ function TransactionRow({
           <span className="block truncate text-sm text-muted">
             <span className="md:hidden">
               {walletText}
-              {tx.note && ' · '}
+              {sub && ' · '}
             </span>
-            {tx.note || <span className="hidden md:inline">—</span>}
+            {sub || <span className="hidden md:inline">—</span>}
           </span>
           {tx.memo && (
             <span className="flex items-center gap-1 text-xs text-muted" title={tx.memo}>
