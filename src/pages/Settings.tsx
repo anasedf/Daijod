@@ -1,5 +1,5 @@
 import { Download, FileUp, HardDrive, Pencil, Plus, Trash2, TriangleAlert, Upload } from 'lucide-react'
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { ImportSheet } from '../components/ImportSheet'
 import { CategoryIcon, errorMessage, FormError, PageHeader, Sheet, useConfirm, useToast } from '../components/ui'
 import type { AppData } from '../hooks/useData'
@@ -7,12 +7,13 @@ import {
   addCategory,
   countCategoryUse,
   deleteCategory,
-  exportBackup,
+
   importBackup,
   resetAllData,
   updateCategory,
 } from '../lib/db'
-import { todayISO } from '../lib/dates'
+import { downloadBackup, lastBackupAt } from '../lib/backup'
+import { formatTimestamp } from '../lib/dates'
 import { CATEGORY_COLORS, ICON_GROUPS } from '../lib/icons'
 import type { Category, CategoryType } from '../lib/types'
 
@@ -250,16 +251,13 @@ export function SettingsPage({ data }: { data: AppData }) {
   const [deleting, setDeleting] = useState<Category | null>(null)
   const [importing, setImporting] = useState(false)
 
+  const [backupTick, setBackupTick] = useState(0)
+  const lastBackup = useMemo(() => lastBackupAt(), [backupTick]) // eslint-disable-line react-hooks/exhaustive-deps
+
   async function exportFile() {
     try {
-      const backup = await exportBackup()
-      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `daijod-backup-${todayISO()}.json`
-      a.click()
-      setTimeout(() => URL.revokeObjectURL(url), 1000)
+      await downloadBackup()
+      setBackupTick((t) => t + 1)
       toast('ดาวน์โหลดไฟล์สำรองแล้ว')
     } catch (e) {
       toast(errorMessage(e), 'error')
@@ -436,6 +434,9 @@ export function SettingsPage({ data }: { data: AppData }) {
                 <Upload size={18} aria-hidden /> นำเข้าจากไฟล์สำรอง
               </button>
             </div>
+            <p className="mt-3 text-center text-xs text-muted">
+              สำรองล่าสุด: {lastBackup ? formatTimestamp(lastBackup) : 'ยังไม่เคย'}
+            </p>
             <input
               ref={fileInput}
               type="file"

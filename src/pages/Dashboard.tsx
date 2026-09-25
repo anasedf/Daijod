@@ -1,4 +1,4 @@
-import { ArrowDownLeft, ArrowUpRight, ChevronRight, ReceiptText, Scale, Wallet, Zap } from 'lucide-react'
+import { ArrowDownLeft, ArrowUpRight, ChevronRight, Download, HardDrive, ReceiptText, Scale, Wallet, Zap } from 'lucide-react'
 import { useMemo, useState, type ReactNode } from 'react'
 import type { Tab } from '../App'
 import { CategoryBars, DailyExpenseChart } from '../components/Charts'
@@ -7,11 +7,56 @@ import { TransactionList } from '../components/TransactionList'
 import { CategoryIcon, EmptyState, errorMessage, PageHeader, useToast, WalletIcon } from '../components/ui'
 import type { AppData } from '../hooks/useData'
 import { formatDateLong, todayISO, toISODate, type DateRange } from '../lib/dates'
+import { backupReminder, downloadBackup, snoozeBackupReminder } from '../lib/backup'
 import { addTransaction, db } from '../lib/db'
 import { expenseByCategory, filterTransactions, sortNewestFirst, summarize } from '../lib/ledger'
 import { formatBaht } from '../lib/money'
 import { suggestQuickAdds, type QuickAdd } from '../lib/quick'
 import type { Transaction } from '../lib/types'
+
+/** แถบเตือนให้สำรองข้อมูล เมื่อไม่เคยสำรองหรือสำรองนานแล้ว */
+function BackupBanner({ data }: { data: AppData }) {
+  const toast = useToast()
+  const [tick, setTick] = useState(0)
+  const reminder = useMemo(() => backupReminder(data.transactions), [data.transactions, tick]) // eslint-disable-line react-hooks/exhaustive-deps
+  if (!reminder) return null
+
+  async function download() {
+    try {
+      await downloadBackup()
+      toast('ดาวน์โหลดไฟล์สำรองแล้ว เก็บไว้ที่อื่นด้วยนะ (เช่น Google Drive)')
+      setTick((t) => t + 1)
+    } catch (e) {
+      toast(errorMessage(e), 'error')
+    }
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl border border-brand/30 bg-brand-soft/60 px-4 py-3 text-sm lg:col-span-12">
+      <span className="flex items-center gap-2 text-ink">
+        <HardDrive size={18} className="shrink-0 text-brand" aria-hidden />
+        {reminder.reason === 'never'
+          ? `มี ${data.transactions.length} รายการแล้ว แต่ยังไม่เคยสำรองข้อมูล ถ้าเครื่องหายหรือล้างเบราว์เซอร์ ข้อมูลจะหายทั้งหมด`
+          : `สำรองข้อมูลล่าสุดเมื่อ ${reminder.days} วันก่อน และมีรายการใหม่หลังจากนั้น`}
+      </span>
+      <span className="ml-auto flex gap-2">
+        <button
+          type="button"
+          className="btn-ghost min-h-9 px-3 text-sm"
+          onClick={() => {
+            snoozeBackupReminder()
+            setTick((t) => t + 1)
+          }}
+        >
+          ไว้ก่อน
+        </button>
+        <button type="button" className="btn-primary min-h-9 px-3 text-sm" onClick={download}>
+          <Download size={16} aria-hidden /> สำรองตอนนี้
+        </button>
+      </span>
+    </div>
+  )
+}
 
 /** ปุ่มลัด: รายการที่จดบ่อย แตะเดียวบันทึกเลย (แก้ได้จากปุ่มบน toast) */
 function QuickAdds({ data, onOpen }: { data: AppData; onOpen: (t: Transaction) => void }) {
@@ -195,6 +240,7 @@ export function DashboardPage({
       />
 
       <div className="grid gap-4 lg:grid-cols-12 lg:gap-5">
+        <BackupBanner data={data} />
         <QuickAdds data={data} onOpen={onOpen} />
 
         {/* ยอดรวม + กระเป๋า */}
