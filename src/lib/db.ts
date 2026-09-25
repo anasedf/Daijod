@@ -246,7 +246,28 @@ export async function skipRecurring(id: string, month: string, d: DaijodDB = db)
   await d.recurring.update(id, { lastMonth: month, updatedAt: Date.now() })
 }
 
+// ---------- ลบเป็นชุด ----------
+
+/** ลบรายการทั้งหมด (กระเป๋า หมวด รายการประจำ ยังอยู่) คืนจำนวนที่ลบ */
+export async function deleteAllTransactions(d: DaijodDB = db): Promise<number> {
+  const n = await d.transactions.count()
+  await d.transactions.clear()
+  return n
+}
+
+/** ลบเฉพาะรายการที่นำเข้าจาก statement (มี importKey) คืนจำนวนที่ลบ */
+export async function deleteImportedTransactions(d: DaijodDB = db): Promise<number> {
+  return d.transactions.filter((t) => !!t.importKey).delete()
+}
+
 // ---------- หมวดหมู่ ----------
+
+/** จัดลำดับหมวดตาม ids ที่ส่งมา (หมวดที่ไม่อยู่ในรายการคงลำดับเดิม) */
+export async function setCategoryOrder(ids: string[], d: DaijodDB = db) {
+  await d.transaction('rw', d.categories, async () => {
+    for (let i = 0; i < ids.length; i++) await d.categories.update(ids[i], { order: i })
+  })
+}
 
 export async function addCategory(input: Omit<Category, 'id'>, d: DaijodDB = db) {
   if (!input.name.trim()) throw new UserError('กรุณาตั้งชื่อหมวด')

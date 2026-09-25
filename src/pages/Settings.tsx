@@ -1,5 +1,6 @@
-import { Download, FileUp, HardDrive, Pencil, Plus, Trash2, TriangleAlert, Upload } from 'lucide-react'
+import { ArrowDown, ArrowUp, ArrowUpDown, Download, FileUp, HardDrive, Pencil, Plus, Trash2, Upload } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { DangerZone } from '../components/DangerZone'
 import { ImportRules } from '../components/ImportRules'
 import { ImportSheet } from '../components/ImportSheet'
 import { RecurringSection } from '../components/RecurringForm'
@@ -11,7 +12,7 @@ import {
   deleteCategory,
 
   importBackup,
-  resetAllData,
+  setCategoryOrder,
   updateCategory,
 } from '../lib/db'
 import { downloadBackup, lastBackupAt } from '../lib/backup'
@@ -281,6 +282,20 @@ export function SettingsPage({ data }: { data: AppData }) {
   const [editing, setEditing] = useState<{ type: CategoryType; category?: Category } | null>(null)
   const [deleting, setDeleting] = useState<Category | null>(null)
   const [importing, setImporting] = useState(false)
+  const [sorting, setSorting] = useState<CategoryType | null>(null)
+
+  /** สลับตำแหน่งหมวดกับตัวข้าง ๆ แล้วบันทึกลำดับใหม่ทั้งชุด */
+  async function move(cats: Category[], i: number, delta: number) {
+    const ids = cats.map((c) => c.id)
+    const j = i + delta
+    if (j < 0 || j >= ids.length) return
+    ;[ids[i], ids[j]] = [ids[j], ids[i]]
+    try {
+      await setCategoryOrder(ids)
+    } catch (e) {
+      toast(errorMessage(e), 'error')
+    }
+  }
 
   const [backupTick, setBackupTick] = useState(0)
   const lastBackup = useMemo(() => lastBackupAt(), [backupTick]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -322,31 +337,6 @@ export function SettingsPage({ data }: { data: AppData }) {
     }
   }
 
-  async function resetAll() {
-    const ok = await confirm({
-      title: 'ลบข้อมูลทั้งหมด?',
-      danger: true,
-      confirmLabel: 'ลบทั้งหมด',
-      message: (
-        <div className="space-y-2">
-          <p>
-            กระเป๋า <b className="text-ink">{data.wallets.length}</b> ใบ และรายการ{' '}
-            <b className="text-ink">{data.transactions.length}</b> รายการ จะถูกลบทั้งหมดและ<b className="text-ink">กู้คืนไม่ได้</b>{' '}
-            หมวดหมู่จะกลับเป็นค่าเริ่มต้น
-          </p>
-          <p className="text-sm text-muted">ถ้ายังไม่แน่ใจ กด “ดาวน์โหลดไฟล์สำรอง” เก็บไว้ก่อน</p>
-        </div>
-      ),
-    })
-    if (!ok) return
-    try {
-      await resetAllData()
-      toast('ลบข้อมูลทั้งหมดแล้ว')
-    } catch (e) {
-      toast(errorMessage(e), 'error')
-    }
-  }
-
   return (
     <>
       <PageHeader title="ตั้งค่า" subtitle="หมวดหมู่และการสำรองข้อมูล" />
@@ -357,15 +347,42 @@ export function SettingsPage({ data }: { data: AppData }) {
             const cats = data.categories.filter((c) => c.type === type)
             return (
               <section key={type} className="card p-5">
-                <div className="mb-4 flex items-center justify-between">
+                <div className="mb-4 flex items-center justify-between gap-2">
                   <div>
                     <h2 className="card-title">หมวด{type === 'income' ? 'รายรับ' : 'รายจ่าย'}</h2>
                     <p className="text-xs text-muted">{cats.length} หมวด</p>
                   </div>
-                  <button className="btn-ghost -mr-2 min-h-9 px-3 text-sm text-brand" onClick={() => setEditing({ type })}>
-                    <Plus size={16} aria-hidden /> เพิ่มหมวด
-                  </button>
+                  <div className="-mr-2 flex">
+                    {cats.length > 1 && (
+                      <button
+                        className={`btn-ghost min-h-9 px-3 text-sm ${sorting === type ? 'text-brand' : ''}`}
+                        onClick={() => setSorting(sorting === type ? null : type)}
+                        aria-pressed={sorting === type}
+                      >
+                        <ArrowUpDown size={16} aria-hidden /> {sorting === type ? 'เสร็จ' : 'จัดเรียง'}
+                      </button>
+                    )}
+                    <button className="btn-ghost min-h-9 px-3 text-sm text-brand" onClick={() => setEditing({ type })}>
+                      <Plus size={16} aria-hidden /> เพิ่มหมวด
+                    </button>
+                  </div>
                 </div>
+                {sorting === type ? (
+                  <ul className="divide-y divide-line/70 rounded-xl border border-line">
+                    {cats.map((c, i) => (
+                      <li key={c.id} className="flex items-center gap-2.5 py-1.5 pr-1.5 pl-3">
+                        <CategoryIcon category={c} size="sm" />
+                        <span className="min-w-0 flex-1 truncate text-sm">{c.name}</span>
+                        <button className="icon-btn h-8 w-8" disabled={i === 0} onClick={() => move(cats, i, -1)} aria-label={`เลื่อน ${c.name} ขึ้น`}>
+                          <ArrowUp size={16} />
+                        </button>
+                        <button className="icon-btn h-8 w-8" disabled={i === cats.length - 1} onClick={() => move(cats, i, 1)} aria-label={`เลื่อน ${c.name} ลง`}>
+                          <ArrowDown size={16} />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
                 <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
                   {cats.map((c) => (
                     <li
@@ -400,6 +417,7 @@ export function SettingsPage({ data }: { data: AppData }) {
                     </li>
                   ))}
                 </ul>
+                )}
               </section>
             )
           })}
@@ -408,20 +426,7 @@ export function SettingsPage({ data }: { data: AppData }) {
 
           <ImportRules data={data} />
 
-          <section className="card border-expense/30 p-5">
-            <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-expense-soft text-expense" aria-hidden>
-                <TriangleAlert size={20} />
-              </span>
-              <h2 className="card-title">ลบข้อมูลทั้งหมด</h2>
-            </div>
-            <p className="mt-3 text-sm text-ink-2">
-              ลบกระเป๋าและรายการทั้งหมดในเครื่องนี้ เริ่มใหม่ตั้งแต่ต้น ถ้าต้องการลบแค่บางรายการ ไปที่หน้า “รายการ” แล้วกด “เลือก”
-            </p>
-            <button className="btn-danger mt-4" onClick={resetAll} disabled={data.wallets.length === 0 && data.transactions.length === 0}>
-              ลบข้อมูลทั้งหมด
-            </button>
-          </section>
+          <DangerZone data={data} />
         </div>
 
         <div className="space-y-4 lg:sticky lg:top-8 lg:space-y-5">

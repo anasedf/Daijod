@@ -43,6 +43,10 @@ export function useData(): AppData | undefined {
 // หมวดเริ่มต้นเรียงตามที่กำหนดไว้ หมวดที่ผู้ใช้เพิ่มเองต่อท้าย เรียงตามชื่อ
 const defaultOrder = new Map(DEFAULT_CATEGORIES.map((c, i) => [c.id, i]))
 function compareCategories(a: Category, b: Category) {
+  // ลำดับที่ผู้ใช้จัดเองมาก่อน แล้วค่อยลำดับหมวดเริ่มต้น แล้วชื่อ
+  const ao = a.order ?? Infinity
+  const bo = b.order ?? Infinity
+  if (ao !== bo) return ao - bo
   const ai = defaultOrder.get(a.id) ?? Infinity
   const bi = defaultOrder.get(b.id) ?? Infinity
   return ai !== bi ? ai - bi : a.name.localeCompare(b.name, 'th')
