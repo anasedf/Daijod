@@ -1,5 +1,6 @@
+import { Download, HardDrive, Plus, Upload } from 'lucide-react'
 import { useRef, useState, type FormEvent } from 'react'
-import { errorMessage, Sheet, useConfirm, useToast } from '../components/ui'
+import { errorMessage, FormError, PageHeader, Sheet, useConfirm, useToast } from '../components/ui'
 import type { AppData } from '../hooks/useData'
 import { addCategory, deleteCategory, exportBackup, importBackup, updateCategory } from '../lib/db'
 import { todayISO } from '../lib/dates'
@@ -15,6 +16,7 @@ function CategoryForm({
   onClose: () => void
 }) {
   const toast = useToast()
+  const confirm = useConfirm()
   const [name, setName] = useState(category?.name ?? '')
   const [icon, setIcon] = useState(category?.icon ?? (type === 'income' ? '💰' : '📦'))
   const [error, setError] = useState('')
@@ -35,12 +37,42 @@ function CategoryForm({
     }
   }
 
+  async function remove() {
+    if (!category) return
+    const ok = await confirm({
+      title: `ลบหมวด “${category.name}”?`,
+      message: <p>ลบได้เฉพาะหมวดที่ยังไม่มีรายการใช้อยู่</p>,
+      confirmLabel: 'ลบหมวด',
+      danger: true,
+    })
+    if (!ok) return
+    try {
+      await deleteCategory(category.id)
+      toast('ลบหมวดแล้ว')
+      onClose()
+    } catch (e) {
+      toast(errorMessage(e), 'error')
+    }
+  }
+
   return (
     <Sheet
       title={`${category ? 'แก้ไข' : 'เพิ่ม'}หมวด${type === 'income' ? 'รายรับ' : 'รายจ่าย'}`}
       onClose={onClose}
+      footer={
+        <div className="flex gap-3">
+          {category && (
+            <button type="button" className="btn-secondary text-expense" onClick={remove}>
+              ลบ
+            </button>
+          )}
+          <button type="submit" form="category-form" className="btn-primary flex-1" disabled={saving}>
+            {saving ? 'กำลังบันทึก…' : 'บันทึก'}
+          </button>
+        </div>
+      }
     >
-      <form onSubmit={submit} className="space-y-4">
+      <form id="category-form" onSubmit={submit} className="space-y-4">
         <div className="grid grid-cols-[5rem_1fr] gap-3">
           <div>
             <label className="label" htmlFor="c-icon">
@@ -48,7 +80,7 @@ function CategoryForm({
             </label>
             <input
               id="c-icon"
-              className="field text-center text-xl"
+              className="field text-center text-2xl"
               value={icon}
               onChange={(e) => setIcon(e.target.value)}
               maxLength={4}
@@ -69,15 +101,8 @@ function CategoryForm({
             />
           </div>
         </div>
-        <p className="text-xs text-slate-500">ใส่อีโมจิเป็นไอคอนได้ (บนมือถือกดปุ่มอีโมจิบนแป้นพิมพ์)</p>
-        {error && (
-          <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800">
-            ⚠️ {error}
-          </p>
-        )}
-        <button type="submit" className="btn-primary w-full" disabled={saving}>
-          {saving ? 'กำลังบันทึก…' : 'บันทึก'}
-        </button>
+        <p className="text-xs text-muted">ใส่อีโมจิเป็นไอคอนได้ (บนมือถือกดปุ่มอีโมจิบนแป้นพิมพ์ บน Windows กด Win + .)</p>
+        {error && <FormError>{error}</FormError>}
       </form>
     </Sheet>
   )
@@ -88,22 +113,6 @@ export function SettingsPage({ data }: { data: AppData }) {
   const confirm = useConfirm()
   const fileInput = useRef<HTMLInputElement>(null)
   const [editing, setEditing] = useState<{ type: CategoryType; category?: Category } | null>(null)
-
-  async function removeCategory(c: Category) {
-    const ok = await confirm({
-      title: `ลบหมวด “${c.name}”?`,
-      message: <p>ลบได้เฉพาะหมวดที่ยังไม่มีรายการใช้อยู่</p>,
-      confirmLabel: 'ลบหมวด',
-      danger: true,
-    })
-    if (!ok) return
-    try {
-      await deleteCategory(c.id)
-      toast('ลบหมวดแล้ว')
-    } catch (e) {
-      toast(errorMessage(e), 'error')
-    }
-  }
 
   async function exportFile() {
     try {
@@ -135,7 +144,7 @@ export function SettingsPage({ data }: { data: AppData }) {
       message: (
         <p>
           ข้อมูลปัจจุบันทั้งหมด ({data.wallets.length} กระเป๋า, {data.transactions.length} รายการ) จะถูก
-          <b>แทนที่</b>ด้วยข้อมูลในไฟล์ “{file.name}”
+          <b className="text-ink">แทนที่</b>ด้วยข้อมูลในไฟล์ “{file.name}”
         </p>
       ),
     })
@@ -149,69 +158,89 @@ export function SettingsPage({ data }: { data: AppData }) {
   }
 
   return (
-    <div className="space-y-4">
-      {(['expense', 'income'] as CategoryType[]).map((type) => (
-        <section key={type} className="card">
-          <h2 className="mb-2 font-semibold">หมวด{type === 'income' ? 'รายรับ' : 'รายจ่าย'}</h2>
-          <ul className="divide-y divide-slate-100">
-            {data.categories
-              .filter((c) => c.type === type)
-              .map((c) => (
-                <li key={c.id} className="flex items-center gap-2 py-2">
-                  <span className="text-xl" aria-hidden>
-                    {c.icon}
-                  </span>
-                  <span className="flex-1">{c.name}</span>
-                  <button
-                    className="rounded-lg px-2 py-1 text-sm text-teal-700 hover:bg-teal-50"
-                    onClick={() => setEditing({ type, category: c })}
-                  >
-                    แก้ไข
+    <>
+      <PageHeader title="ตั้งค่า" subtitle="หมวดหมู่และการสำรองข้อมูล" />
+
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-5">
+        <div className="space-y-4 lg:space-y-5">
+          {(['expense', 'income'] as CategoryType[]).map((type) => {
+            const cats = data.categories.filter((c) => c.type === type)
+            return (
+              <section key={type} className="card p-5">
+                <div className="mb-4 flex items-center justify-between">
+                  <div>
+                    <h2 className="card-title">หมวด{type === 'income' ? 'รายรับ' : 'รายจ่าย'}</h2>
+                    <p className="text-xs text-muted">{cats.length} หมวด · แตะเพื่อแก้ไข</p>
+                  </div>
+                  <button className="btn-ghost -mr-2 min-h-9 px-3 text-sm text-brand" onClick={() => setEditing({ type })}>
+                    <Plus size={16} aria-hidden /> เพิ่มหมวด
                   </button>
-                  <button
-                    className="rounded-lg px-2 py-1 text-sm text-red-700 hover:bg-red-50"
-                    onClick={() => removeCategory(c)}
-                  >
-                    ลบ
-                  </button>
-                </li>
-              ))}
-          </ul>
-          <button className="btn-secondary mt-2 w-full" onClick={() => setEditing({ type })}>
-            + เพิ่มหมวด
-          </button>
+                </div>
+                <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
+                  {cats.map((c) => (
+                    <li key={c.id}>
+                      <button
+                        className="flex w-full items-center gap-2.5 rounded-xl border border-line px-3 py-2.5 text-left text-sm transition-colors hover:border-brand/40 hover:bg-sunken"
+                        onClick={() => setEditing({ type, category: c })}
+                        aria-label={`แก้ไขหมวด ${c.name}`}
+                      >
+                        <span className="text-xl" aria-hidden>
+                          {c.icon}
+                        </span>
+                        <span className="truncate">{c.name}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )
+          })}
+        </div>
+
+        <section className="card p-5 lg:sticky lg:top-8">
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-soft text-brand" aria-hidden>
+              <HardDrive size={20} />
+            </span>
+            <h2 className="card-title">สำรองข้อมูล</h2>
+          </div>
+          <p className="mt-3 text-sm text-ink-2">
+            ข้อมูลทั้งหมดเก็บอยู่ในเบราว์เซอร์ของเครื่องนี้เท่านั้น ถ้าล้างข้อมูลเบราว์เซอร์หรือเปลี่ยนเครื่อง
+            ข้อมูลจะหาย ควรสำรองเก็บไว้เป็นระยะ
+          </p>
+          <dl className="mt-4 grid grid-cols-2 gap-2 text-center">
+            <div className="rounded-xl bg-sunken p-3">
+              <dt className="text-xs text-muted">กระเป๋า</dt>
+              <dd className="num text-lg font-semibold">{data.wallets.length}</dd>
+            </div>
+            <div className="rounded-xl bg-sunken p-3">
+              <dt className="text-xs text-muted">รายการ</dt>
+              <dd className="num text-lg font-semibold">{data.transactions.length}</dd>
+            </div>
+          </dl>
+          <div className="mt-4 space-y-2">
+            <button className="btn-primary w-full" onClick={exportFile}>
+              <Download size={18} aria-hidden /> ดาวน์โหลดไฟล์สำรอง
+            </button>
+            <button className="btn-secondary w-full" onClick={() => fileInput.current?.click()}>
+              <Upload size={18} aria-hidden /> นำเข้าจากไฟล์สำรอง
+            </button>
+          </div>
+          <input
+            ref={fileInput}
+            type="file"
+            accept="application/json,.json"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              e.target.value = ''
+              if (f) importFile(f)
+            }}
+          />
         </section>
-      ))}
+      </div>
 
-      <section className="card space-y-3">
-        <h2 className="font-semibold">สำรองข้อมูล</h2>
-        <p className="text-sm text-slate-600">
-          ข้อมูลทั้งหมดเก็บอยู่ในเบราว์เซอร์ของเครื่องนี้เท่านั้น ถ้าล้างข้อมูลเบราว์เซอร์หรือเปลี่ยนเครื่อง
-          ข้อมูลจะหาย ควรกดสำรองเก็บไว้เป็นระยะ
-        </p>
-        <button className="btn-primary w-full" onClick={exportFile}>
-          ⬇️ ดาวน์โหลดไฟล์สำรอง (.json)
-        </button>
-        <button className="btn-secondary w-full" onClick={() => fileInput.current?.click()}>
-          ⬆️ นำเข้าจากไฟล์สำรอง
-        </button>
-        <input
-          ref={fileInput}
-          type="file"
-          accept="application/json,.json"
-          className="hidden"
-          onChange={(e) => {
-            const f = e.target.files?.[0]
-            e.target.value = ''
-            if (f) importFile(f)
-          }}
-        />
-      </section>
-
-
-      {editing && (
-        <CategoryForm type={editing.type} category={editing.category} onClose={() => setEditing(null)} />
-      )}
-    </div>
+      {editing && <CategoryForm type={editing.type} category={editing.category} onClose={() => setEditing(null)} />}
+    </>
   )
 }

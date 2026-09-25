@@ -12,6 +12,8 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg', 'apple-touch-icon.png', 'favicon-64.png'],
+      // เก็บฟอนต์ไว้ด้วย ให้หน้าตาเหมือนเดิมตอนออฟไลน์
+      workbox: { globPatterns: ['**/*.{js,css,html,woff2}'] },
       manifest: {
         name: 'ได้จด — จดรายรับรายจ่าย',
         short_name: 'ได้จด',
@@ -21,8 +23,8 @@ export default defineConfig({
         scope: './',
         display: 'standalone',
         orientation: 'portrait',
-        background_color: '#f1f5f9',
-        theme_color: '#0f766e',
+        background_color: '#f4f3ef',
+        theme_color: '#0d7a5f',
         icons: [
           { src: 'pwa-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'pwa-512.png', sizes: '512x512', type: 'image/png' },

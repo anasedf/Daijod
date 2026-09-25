@@ -1,3 +1,4 @@
+import { CircleAlert, CircleCheck, X, type LucideIcon } from 'lucide-react'
 import {
   createContext,
   useCallback,
@@ -8,17 +9,23 @@ import {
   type ReactNode,
 } from 'react'
 import { UserError } from '../lib/db'
+import { WALLET_TYPES } from '../lib/labels'
+import type { Wallet } from '../lib/types'
 
-// ---------- Sheet (หน้าต่างเลื่อนขึ้นจากด้านล่างบนมือถือ) ----------
+// ---------- Sheet (มือถือ: เลื่อนขึ้นจากด้านล่าง / จอใหญ่: หน้าต่างกลางจอ) ----------
 
 export function Sheet({
   title,
   onClose,
   children,
+  footer,
+  wide = false,
 }: {
   title: string
   onClose: () => void
   children: ReactNode
+  footer?: ReactNode
+  wide?: boolean
 }) {
   const panel = useRef<HTMLDivElement>(null)
   // เก็บ onClose ใน ref เพื่อให้ effect ทำงานครั้งเดียวตอนเปิด (ไม่แย่งโฟกัสระหว่างพิมพ์)
@@ -40,30 +47,102 @@ export function Sheet({
   }, [])
 
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center sm:items-center" role="presentation">
-      <div className="absolute inset-0 bg-slate-900/40" onClick={onClose} />
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-6" role="presentation">
+      <div className="anim-fade absolute inset-0 bg-black/45 backdrop-blur-[2px]" onClick={onClose} />
       <div
         ref={panel}
         tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="relative max-h-[92dvh] w-full max-w-lg overflow-y-auto rounded-t-2xl bg-white pb-[env(safe-area-inset-bottom)] shadow-xl outline-none sm:rounded-2xl"
+        className={`anim-sheet sm:anim-pop relative flex max-h-[94dvh] w-full flex-col overflow-hidden rounded-t-3xl bg-surface shadow-2xl outline-none sm:max-h-[88dvh] sm:rounded-2xl ${
+          wide ? 'sm:max-w-xl' : 'sm:max-w-md'
+        }`}
       >
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-white px-4 py-3">
+        <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-line sm:hidden" aria-hidden />
+        <div className="flex shrink-0 items-center justify-between gap-3 px-5 pt-3 pb-2 sm:pt-5">
           <h2 className="text-lg font-semibold">{title}</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="-mr-2 rounded-full px-3 py-1 text-2xl leading-none text-slate-500 hover:bg-slate-100"
-            aria-label="ปิด"
-          >
-            ×
+          <button type="button" onClick={onClose} className="icon-btn -mr-2" aria-label="ปิด">
+            <X size={20} />
           </button>
         </div>
-        <div className="p-4">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-2 pb-5">{children}</div>
+        {footer && (
+          <div className="shrink-0 border-t border-line bg-surface px-5 pt-3 pb-[max(env(safe-area-inset-bottom),1rem)] sm:pb-4">
+            {footer}
+          </div>
+        )}
+        {!footer && <div className="h-[env(safe-area-inset-bottom)] shrink-0" />}
       </div>
     </div>
+  )
+}
+
+// ---------- ชิ้นส่วนเล็ก ๆ ที่ใช้ซ้ำ ----------
+
+export function PageHeader({
+  title,
+  subtitle,
+  actions,
+}: {
+  title: string
+  subtitle?: ReactNode
+  actions?: ReactNode
+}) {
+  return (
+    <header className="mb-5 flex flex-wrap items-end justify-between gap-x-6 gap-y-3 lg:mb-8">
+      <div className="min-w-0">
+        <h1 className="text-2xl font-bold tracking-tight lg:text-3xl">{title}</h1>
+        {subtitle && <p className="mt-0.5 text-sm text-muted">{subtitle}</p>}
+      </div>
+      {actions && <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">{actions}</div>}
+    </header>
+  )
+}
+
+export function WalletIcon({ wallet, size = 'md' }: { wallet: Wallet; size?: 'sm' | 'md' | 'lg' }) {
+  const { Icon } = WALLET_TYPES[wallet.type]
+  const box = size === 'sm' ? 'h-7 w-7 rounded-lg' : size === 'lg' ? 'h-11 w-11 rounded-xl' : 'h-9 w-9 rounded-xl'
+  return (
+    <span
+      className={`flex shrink-0 items-center justify-center text-white ${box}`}
+      style={{ backgroundColor: wallet.color }}
+      aria-hidden
+    >
+      <Icon size={size === 'sm' ? 15 : size === 'lg' ? 22 : 18} strokeWidth={2} />
+    </span>
+  )
+}
+
+export function EmptyState({
+  icon: Icon,
+  title,
+  children,
+  action,
+}: {
+  icon: LucideIcon
+  title: string
+  children?: ReactNode
+  action?: ReactNode
+}) {
+  return (
+    <div className="flex flex-col items-center px-6 py-10 text-center">
+      <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-soft text-brand" aria-hidden>
+        <Icon size={26} />
+      </span>
+      <h3 className="mt-4 font-semibold">{title}</h3>
+      {children && <p className="mt-1 max-w-sm text-sm text-ink-2">{children}</p>}
+      {action && <div className="mt-5">{action}</div>}
+    </div>
+  )
+}
+
+export function FormError({ children }: { children: ReactNode }) {
+  return (
+    <p role="alert" className="flex gap-2 rounded-xl bg-expense-soft p-3 text-sm whitespace-pre-line text-expense">
+      <CircleAlert size={18} className="mt-0.5 shrink-0" aria-hidden />
+      <span>{children}</span>
+    </p>
   )
 }
 
@@ -128,35 +207,42 @@ export function UIProvider({ children }: { children: ReactNode }) {
       <ConfirmContext.Provider value={ask}>
         {children}
         {confirm && (
-          <Sheet title={confirm.title} onClose={cancelConfirm}>
-            <div className="text-slate-700">{confirm.message}</div>
-            <div className="mt-6 flex gap-3">
-              <button type="button" className="btn-secondary flex-1" onClick={cancelConfirm}>
-                ยกเลิก
-              </button>
-              <button
-                type="button"
-                className={`flex-1 ${confirm.danger ? 'btn-danger' : 'btn-primary'}`}
-                onClick={() => closeConfirm(true)}
-              >
-                {confirm.confirmLabel}
-              </button>
-            </div>
+          <Sheet
+            title={confirm.title}
+            onClose={cancelConfirm}
+            footer={
+              <div className="flex gap-3">
+                <button type="button" className="btn-secondary flex-1" onClick={cancelConfirm}>
+                  ยกเลิก
+                </button>
+                <button
+                  type="button"
+                  className={`flex-1 ${confirm.danger ? 'btn-danger' : 'btn-primary'}`}
+                  onClick={() => closeConfirm(true)}
+                >
+                  {confirm.confirmLabel}
+                </button>
+              </div>
+            }
+          >
+            <div className="text-ink-2">{confirm.message}</div>
           </Sheet>
         )}
         <div
           aria-live="polite"
-          className="pointer-events-none fixed inset-x-0 top-[max(env(safe-area-inset-top),0.75rem)] z-50 flex justify-center px-4"
+          className="pointer-events-none fixed inset-x-0 top-[max(env(safe-area-inset-top),0.75rem)] z-[60] flex justify-center px-4 lg:top-auto lg:right-6 lg:bottom-6 lg:left-auto lg:justify-end"
         >
           {toast && (
             <div
               key={toast.id}
               role={toast.kind === 'error' ? 'alert' : 'status'}
-              className={`max-w-sm whitespace-pre-line rounded-xl px-4 py-3 text-sm font-medium text-white shadow-lg ${
-                toast.kind === 'error' ? 'bg-red-700' : 'bg-slate-800'
-              }`}
+              className="anim-sheet flex max-w-sm items-start gap-2 rounded-xl bg-ink px-4 py-3 text-sm font-medium whitespace-pre-line text-canvas shadow-xl"
             >
-              {toast.kind === 'error' ? '⚠️ ' : '✓ '}
+              {toast.kind === 'error' ? (
+                <CircleAlert size={18} className="mt-0.5 shrink-0 text-expense" aria-hidden />
+              ) : (
+                <CircleCheck size={18} className="mt-0.5 shrink-0 text-brand" aria-hidden />
+              )}
               {toast.message}
             </div>
           )}

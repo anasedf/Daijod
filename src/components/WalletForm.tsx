@@ -1,9 +1,9 @@
 import { useState, type FormEvent } from 'react'
 import { addWallet, updateWallet } from '../lib/db'
 import { WALLET_COLORS, WALLET_TYPES } from '../lib/labels'
-import { amountToInput, parseAmount } from '../lib/money'
+import { amountToInput, formatBaht, parseAmount } from '../lib/money'
 import type { Wallet, WalletType } from '../lib/types'
-import { errorMessage, Sheet, useToast } from './ui'
+import { errorMessage, FormError, Sheet, useToast } from './ui'
 
 export function WalletForm({ wallet, onClose }: { wallet?: Wallet; onClose: () => void }) {
   const toast = useToast()
@@ -32,9 +32,34 @@ export function WalletForm({ wallet, onClose }: { wallet?: Wallet; onClose: () =
     }
   }
 
+  const preview = parseAmount(opening) ?? 0
+  const { Icon } = WALLET_TYPES[type]
+
   return (
-    <Sheet title={wallet ? 'แก้ไขกระเป๋า' : 'เพิ่มกระเป๋า'} onClose={onClose}>
-      <form onSubmit={submit} className="space-y-4">
+    <Sheet
+      title={wallet ? 'แก้ไขกระเป๋า' : 'เพิ่มกระเป๋า'}
+      onClose={onClose}
+      footer={
+        <button type="submit" form="wallet-form" className="btn-primary w-full" disabled={saving}>
+          {saving ? 'กำลังบันทึก…' : 'บันทึก'}
+        </button>
+      }
+    >
+      <form id="wallet-form" onSubmit={submit} className="space-y-5">
+        {/* ตัวอย่างการ์ด */}
+        <div
+          className="relative overflow-hidden rounded-2xl p-4 text-white"
+          style={{ background: `linear-gradient(135deg, ${color}, color-mix(in oklab, ${color} 70%, black))` }}
+          aria-hidden
+        >
+          <Icon size={110} strokeWidth={1.2} className="absolute -right-4 -bottom-8 opacity-15" />
+          <div className="flex items-center gap-2 text-sm opacity-85">
+            <Icon size={16} /> {WALLET_TYPES[type].label}
+          </div>
+          <div className="mt-4 truncate font-semibold">{name.trim() || 'ชื่อกระเป๋า'}</div>
+          <div className="num text-2xl font-bold">{formatBaht(preview)}</div>
+        </div>
+
         <div>
           <label className="label" htmlFor="w-name">
             ชื่อ
@@ -47,24 +72,28 @@ export function WalletForm({ wallet, onClose }: { wallet?: Wallet; onClose: () =
             placeholder="เช่น กสิกร, TrueMoney"
             maxLength={40}
             required
+            autoFocus={!wallet}
           />
         </div>
         <fieldset>
           <legend className="label">ประเภท</legend>
           <div className="grid grid-cols-2 gap-2">
-            {(Object.keys(WALLET_TYPES) as WalletType[]).map((t) => (
-              <button
-                key={t}
-                type="button"
-                aria-pressed={type === t}
-                onClick={() => setType(t)}
-                className={`min-h-12 rounded-xl border px-3 text-left ${
-                  type === t ? 'border-teal-700 bg-teal-50 font-semibold' : 'border-slate-300'
-                }`}
-              >
-                {WALLET_TYPES[t].icon} {WALLET_TYPES[t].label}
-              </button>
-            ))}
+            {(Object.keys(WALLET_TYPES) as WalletType[]).map((t) => {
+              const T = WALLET_TYPES[t]
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  aria-pressed={type === t}
+                  onClick={() => setType(t)}
+                  className={`flex min-h-11 items-center gap-2 rounded-xl border px-3 text-left text-sm transition-colors ${
+                    type === t ? 'border-brand bg-brand-soft font-semibold text-brand' : 'border-line hover:bg-sunken'
+                  }`}
+                >
+                  <T.Icon size={18} aria-hidden /> {T.label}
+                </button>
+              )
+            })}
           </div>
         </fieldset>
         <div>
@@ -73,17 +102,17 @@ export function WalletForm({ wallet, onClose }: { wallet?: Wallet; onClose: () =
           </label>
           <input
             id="w-open"
-            className="field"
+            className="field num"
             inputMode="decimal"
             value={opening}
             onChange={(e) => setOpening(e.target.value)}
             placeholder="0"
           />
-          <p className="mt-1 text-xs text-slate-500">ยอดเงินที่มีอยู่ตอนเริ่มจด ติดลบได้ (เช่น บัตรเครดิต)</p>
+          <p className="mt-1.5 text-xs text-muted">ยอดเงินที่มีอยู่ตอนเริ่มจด ติดลบได้ (เช่น บัตรเครดิต)</p>
         </div>
         <fieldset>
           <legend className="label">สี</legend>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2.5">
             {WALLET_COLORS.map((c, i) => (
               <button
                 key={c}
@@ -91,20 +120,15 @@ export function WalletForm({ wallet, onClose }: { wallet?: Wallet; onClose: () =
                 aria-label={`สีที่ ${i + 1}`}
                 aria-pressed={color === c}
                 onClick={() => setColor(c)}
-                className={`h-10 w-10 rounded-full ${color === c ? 'ring-4 ring-slate-400 ring-offset-2' : ''}`}
+                className={`h-9 w-9 rounded-full transition-transform hover:scale-110 ${
+                  color === c ? 'ring-2 ring-ink ring-offset-2 ring-offset-surface' : ''
+                }`}
                 style={{ backgroundColor: c }}
               />
             ))}
           </div>
         </fieldset>
-        {error && (
-          <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800">
-            ⚠️ {error}
-          </p>
-        )}
-        <button type="submit" className="btn-primary w-full" disabled={saving}>
-          {saving ? 'กำลังบันทึก…' : 'บันทึก'}
-        </button>
+        {error && <FormError>{error}</FormError>}
       </form>
     </Sheet>
   )

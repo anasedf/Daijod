@@ -1,30 +1,172 @@
 @import "tailwindcss";
+@import "@fontsource-variable/anuphan";
 
-html {
-  font-family: system-ui, -apple-system, "Segoe UI", "Noto Sans Thai", "Sarabun", sans-serif;
-  -webkit-tap-highlight-color: transparent;
+/* สีทั้งหมดเป็น token ตามหน้าที่ แล้วสลับค่าในโหมดมืดที่เดียว */
+@theme {
+  --font-sans: "Anuphan Variable", system-ui, -apple-system, "Segoe UI", "Noto Sans Thai", sans-serif;
+
+  --color-canvas: #f4f3ef;
+  --color-surface: #ffffff;
+  --color-sunken: #eeede8;
+  --color-line: #e3e1da;
+  --color-ink: #17171a;
+  --color-ink-2: #4f4e4a;
+  --color-muted: #85837b;
+
+  --color-brand: #0d7a5f;
+  --color-brand-strong: #0a634d;
+  --color-brand-soft: #e2f1eb;
+  --color-on-brand: #ffffff;
+
+  --color-hero: #17231f;
+  --color-on-hero: #f3f7f5;
+
+  --color-income: #12804d;
+  --color-income-soft: #e3f3ea;
+  --color-expense: #cf3f33;
+  --color-expense-soft: #fbe9e6;
+  --color-transfer: #2d6bcf;
+  --color-transfer-soft: #e6eefb;
+
+  --color-chart: #0d7a5f;
+  --color-chart-track: #ecebe5;
 }
-body {
-  @apply bg-slate-100 text-slate-900;
+
+@layer base {
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --color-canvas: #0f0f0e;
+      --color-surface: #1a1a18;
+      --color-sunken: #232320;
+      --color-line: #2e2d2a;
+      --color-ink: #f2f1ec;
+      --color-ink-2: #c4c2b9;
+      --color-muted: #8f8d84;
+
+      --color-brand: #3cbf95;
+      --color-brand-strong: #5ad0a8;
+      --color-brand-soft: #16302a;
+      --color-on-brand: #07130f;
+
+      --color-hero: #13302a;
+      --color-on-hero: #eef7f3;
+
+      --color-income: #4cc68a;
+      --color-income-soft: #15291f;
+      --color-expense: #f2766a;
+      --color-expense-soft: #33191a;
+      --color-transfer: #6ea3f2;
+      --color-transfer-soft: #172336;
+
+      --color-chart: #3cbf95;
+      --color-chart-track: #2a2a27;
+    }
+  }
+
+  html {
+    -webkit-tap-highlight-color: transparent;
+    font-feature-settings: "tnum" 0;
+  }
+  body {
+    @apply bg-canvas font-sans text-ink antialiased;
+  }
+  button,
+  [role="button"] {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-brand;
+  }
 }
 
 @layer components {
+  .btn-primary,
+  .btn-secondary,
+  .btn-ghost,
+  .btn-danger {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 text-[0.95rem] font-semibold transition-colors disabled:opacity-50;
+  }
   .btn-primary {
-    @apply inline-flex min-h-12 items-center justify-center rounded-xl bg-teal-700 px-4 font-semibold text-white hover:bg-teal-800 disabled:opacity-50;
+    @apply bg-brand text-on-brand hover:bg-brand-strong;
   }
   .btn-secondary {
-    @apply inline-flex min-h-12 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50;
+    @apply border border-line bg-surface text-ink hover:bg-sunken;
+  }
+  .btn-ghost {
+    @apply text-ink-2 hover:bg-sunken hover:text-ink;
   }
   .btn-danger {
-    @apply inline-flex min-h-12 items-center justify-center rounded-xl bg-red-700 px-4 font-semibold text-white hover:bg-red-800 disabled:opacity-50;
+    @apply bg-expense text-white hover:opacity-90 dark:text-canvas;
+  }
+  .icon-btn {
+    @apply inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-sunken hover:text-ink;
   }
   .field {
-    @apply block w-full min-h-12 rounded-xl border border-slate-300 bg-white px-3 text-base focus:border-teal-600 focus:ring-2 focus:ring-teal-600/30 focus:outline-none;
+    @apply block min-h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink placeholder:text-muted focus:border-brand focus:ring-3 focus:ring-brand/20 focus:outline-none disabled:opacity-50;
   }
   .label {
-    @apply mb-1 block text-sm font-medium text-slate-600;
+    @apply mb-1.5 block text-sm font-medium text-ink-2;
   }
   .card {
-    @apply rounded-2xl bg-white p-4 shadow-sm;
+    @apply rounded-2xl border border-line/70 bg-surface;
+  }
+  .card-title {
+    @apply text-[0.95rem] font-semibold text-ink;
+  }
+  .segmented {
+    @apply flex gap-1 rounded-xl bg-sunken p-1;
+  }
+  .segmented > button {
+    @apply min-h-9 flex-1 rounded-lg px-3 text-sm font-medium whitespace-nowrap text-ink-2 transition-colors hover:text-ink;
+  }
+  .segmented > button[aria-checked="true"] {
+    @apply bg-surface text-ink shadow-sm;
+  }
+  .num {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes pop-in {
+  from {
+    transform: scale(0.97);
+    opacity: 0;
+  }
+}
+/* @utility เพื่อให้ใช้กับ breakpoint ได้ เช่น sm:anim-pop */
+@utility anim-sheet {
+  animation: sheet-up 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@utility anim-pop {
+  animation: pop-in 0.16s ease-out;
+}
+@utility anim-fade {
+  animation: fade-in 0.16s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+  }
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
   }
 }

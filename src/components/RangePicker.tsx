@@ -1,4 +1,4 @@
-import { monthRange, todayISO, type DateRange } from '../lib/dates'
+import { formatDateShort, monthRange, todayISO, type DateRange } from '../lib/dates'
 
 export type RangeMode = 'today' | 'month' | 'all' | 'custom'
 
@@ -24,6 +24,13 @@ export function defaultRange(mode: RangeMode = 'month'): RangeValue {
   return { mode, custom: monthRange() }
 }
 
+/** ข้อความช่วงวันที่ เช่น "1 ก.ย. 69 – 30 ก.ย. 69" */
+export function rangeLabel(range: Partial<DateRange> | undefined): string {
+  if (!range?.from || !range.to) return 'ทุกช่วงเวลา'
+  if (range.from === range.to) return formatDateShort(range.from)
+  return `${formatDateShort(range.from)} – ${formatDateShort(range.to)}`
+}
+
 const MODES: { mode: RangeMode; label: string }[] = [
   { mode: 'today', label: 'วันนี้' },
   { mode: 'month', label: 'เดือนนี้' },
@@ -35,15 +42,17 @@ export function RangePicker({
   value,
   onChange,
   showAll = false,
+  className = '',
 }: {
   value: RangeValue
   onChange: (v: RangeValue) => void
   showAll?: boolean
+  className?: string
 }) {
   const modes = MODES.filter((m) => showAll || m.mode !== 'all')
   return (
-    <div className="space-y-2">
-      <div role="radiogroup" aria-label="ช่วงเวลา" className="flex gap-1 rounded-xl bg-white p-1 shadow-sm">
+    <div className={`flex flex-wrap items-center gap-2 ${className}`}>
+      <div role="radiogroup" aria-label="ช่วงเวลา" className="segmented w-full sm:w-auto">
         {modes.map((m) => (
           <button
             key={m.mode}
@@ -51,36 +60,35 @@ export function RangePicker({
             role="radio"
             aria-checked={value.mode === m.mode}
             onClick={() => onChange({ ...value, mode: m.mode })}
-            className={`min-h-10 flex-1 rounded-lg text-sm font-medium ${
-              value.mode === m.mode ? 'bg-teal-700 text-white' : 'text-slate-600'
-            }`}
           >
             {m.label}
           </button>
         ))}
       </div>
       {value.mode === 'custom' && (
-        <div className="grid grid-cols-2 gap-2">
-          <label className="text-xs text-slate-600">
+        <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
+          <label className="sr-only" htmlFor="range-from">
             ตั้งแต่
-            <input
-              type="date"
-              className="field mt-1"
-              value={value.custom.from}
-              max={value.custom.to}
-              onChange={(e) => e.target.value && onChange({ ...value, custom: { ...value.custom, from: e.target.value } })}
-            />
           </label>
-          <label className="text-xs text-slate-600">
+          <input
+            id="range-from"
+            type="date"
+            className="field min-h-10 text-sm"
+            value={value.custom.from}
+            max={value.custom.to}
+            onChange={(e) => e.target.value && onChange({ ...value, custom: { ...value.custom, from: e.target.value } })}
+          />
+          <label className="sr-only" htmlFor="range-to">
             ถึง
-            <input
-              type="date"
-              className="field mt-1"
-              value={value.custom.to}
-              min={value.custom.from}
-              onChange={(e) => e.target.value && onChange({ ...value, custom: { ...value.custom, to: e.target.value } })}
-            />
           </label>
+          <input
+            id="range-to"
+            type="date"
+            className="field min-h-10 text-sm"
+            value={value.custom.to}
+            min={value.custom.from}
+            onChange={(e) => e.target.value && onChange({ ...value, custom: { ...value.custom, to: e.target.value } })}
+          />
         </div>
       )}
     </div>

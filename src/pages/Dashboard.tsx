@@ -1,153 +1,233 @@
-import { useMemo, useState } from 'react'
-import { defaultRange, RangePicker, resolveRange } from '../components/RangePicker'
+import { ArrowDownLeft, ArrowUpRight, ChevronRight, ReceiptText, Scale, Wallet } from 'lucide-react'
+import { useMemo, useState, type ReactNode } from 'react'
+import type { Tab } from '../App'
+import { CategoryBars, DailyExpenseChart } from '../components/Charts'
+import { defaultRange, RangePicker, rangeLabel, resolveRange } from '../components/RangePicker'
 import { TransactionList } from '../components/TransactionList'
+import { EmptyState, PageHeader, WalletIcon } from '../components/ui'
 import type { AppData } from '../hooks/useData'
-import { formatDateShort } from '../lib/dates'
-import { WALLET_TYPES } from '../lib/labels'
+import { formatDateLong, todayISO, toISODate, type DateRange } from '../lib/dates'
 import { expenseByCategory, filterTransactions, sortNewestFirst, summarize } from '../lib/ledger'
 import { formatBaht } from '../lib/money'
 import type { Transaction } from '../lib/types'
 
-function Stat({ label, value, tone, icon }: { label: string; value: number; tone: string; icon: string }) {
+function StatTile({
+  label,
+  value,
+  icon,
+  tone,
+  hint,
+}: {
+  label: string
+  value: ReactNode
+  icon: ReactNode
+  tone: string
+  hint?: string
+}) {
   return (
-    <div className="card p-3">
-      <div className="text-xs text-slate-600">
-        <span aria-hidden>{icon}</span> {label}
+    <div className="card p-4">
+      <div className="flex items-center gap-2 text-sm text-ink-2">
+        <span className={`flex h-7 w-7 items-center justify-center rounded-lg ${tone}`} aria-hidden>
+          {icon}
+        </span>
+        {label}
       </div>
-      <div className={`mt-1 text-lg font-bold break-all tabular-nums ${tone}`}>{formatBaht(value)}</div>
+      <div className="num mt-3 text-xl font-bold tracking-tight break-all lg:text-2xl">{value}</div>
+      {hint && <div className="mt-0.5 text-xs text-muted">{hint}</div>}
     </div>
   )
+}
+
+function CardHeader({ title, subtitle, action }: { title: string; subtitle?: string; action?: ReactNode }) {
+  return (
+    <div className="flex items-start justify-between gap-3 px-5 pt-4 pb-3">
+      <div>
+        <h2 className="card-title">{title}</h2>
+        {subtitle && <p className="text-xs text-muted">{subtitle}</p>}
+      </div>
+      {action}
+    </div>
+  )
+}
+
+/** ช่วงของกราฟรายวัน: ใช้ช่วงที่เลือกถ้าอยู่ระหว่าง 2–62 วัน ไม่งั้นแสดง 30 วันล่าสุด */
+function chartRange(range: Partial<DateRange> | undefined): DateRange {
+  if (range?.from && range.to && range.from !== range.to) {
+    const days = (Date.parse(range.to) - Date.parse(range.from)) / 86_400_000
+    if (days <= 62) return { from: range.from, to: range.to }
+  }
+  const from = new Date()
+  from.setDate(from.getDate() - 29)
+  return { from: toISODate(from), to: todayISO() }
 }
 
 export function DashboardPage({
   data,
   onOpen,
   onAddWallet,
-  onSeeAll,
+  onNavigate,
 }: {
   data: AppData
   onOpen: (t: Transaction) => void
   onAddWallet: () => void
-  onSeeAll: () => void
+  onNavigate: (tab: Tab) => void
 }) {
   const [rangeValue, setRangeValue] = useState(defaultRange('month'))
   const range = resolveRange(rangeValue)
 
-  const { sum, byCat, recent } = useMemo(() => {
-    const inRange = filterTransactions(
-      data.transactions,
-      { range: resolveRange(rangeValue) },
-      data.categoryMap,
-      data.walletMap,
-    )
+  const { inRange, sum, byCat, recent, daily } = useMemo(() => {
+    const r = resolveRange(rangeValue)
+    const inRange = filterTransactions(data.transactions, { range: r }, data.categoryMap, data.walletMap)
+    const daily = chartRange(r)
     return {
+      inRange,
       sum: summarize(inRange),
       byCat: expenseByCategory(inRange),
-      recent: sortNewestFirst(inRange).slice(0, 5),
+      recent: sortNewestFirst(inRange).slice(0, 6),
+      daily: { range: daily, txs: filterTransactions(data.transactions, { range: daily }, data.categoryMap, data.walletMap) },
     }
   }, [data, rangeValue])
 
   if (data.wallets.length === 0) {
     return (
-      <div className="card space-y-3 py-8 text-center">
-        <div className="text-5xl" aria-hidden>
-          👛
+      <>
+        <PageHeader title="ยินดีต้อนรับ" subtitle={formatDateLong(todayISO())} />
+        <div className="card mx-auto max-w-lg">
+          <EmptyState
+            icon={Wallet}
+            title="เริ่มจากเพิ่มกระเป๋าแรก"
+            action={
+              <button className="btn-primary" onClick={onAddWallet}>
+                เพิ่มกระเป๋าแรก
+              </button>
+            }
+          >
+            กระเป๋าคือที่เก็บเงิน เช่น เงินสด บัญชีธนาคาร หรือ e-Wallet ใส่ยอดเงินที่มีตอนนี้ แล้วเริ่มจดรายรับรายจ่ายได้เลย
+          </EmptyState>
         </div>
-        <h2 className="text-lg font-semibold">ยินดีต้อนรับสู่ ได้จด</h2>
-        <p className="text-slate-600">เริ่มจากเพิ่มกระเป๋าแรก เช่น เงินสด หรือบัญชีธนาคาร พร้อมยอดเงินที่มีตอนนี้</p>
-        <button className="btn-primary" onClick={onAddWallet}>
-          + เพิ่มกระเป๋าแรก
-        </button>
-      </div>
+      </>
     )
   }
 
-  const maxCat = byCat[0]?.amount ?? 0
-  const rangeLabel =
-    range && range.from && range.to
-      ? range.from === range.to
-        ? formatDateShort(range.from)
-        : `${formatDateShort(range.from)} – ${formatDateShort(range.to)}`
-      : ''
+  const count = inRange.filter((t) => t.type !== 'transfer').length
+  const dailyIsSelected = daily.range.from === range?.from && daily.range.to === range?.to
 
   return (
-    <div className="space-y-4">
-      <section className="rounded-2xl bg-teal-700 p-4 text-white shadow-sm">
-        <div className="text-sm opacity-90">ยอดคงเหลือรวม</div>
-        <div className="mt-1 text-3xl font-bold tabular-nums">{formatBaht(data.total)}</div>
-        <ul className="mt-3 space-y-1 text-sm">
-          {data.wallets.map((w) => (
-            <li key={w.id} className="flex justify-between gap-2">
-              <span className="truncate">
-                <span aria-hidden>{WALLET_TYPES[w.type].icon}</span> {w.name}
-              </span>
-              <span className="tabular-nums">{formatBaht(data.balances.get(w.id) ?? 0)}</span>
-            </li>
-          ))}
-        </ul>
-      </section>
+    <>
+      <PageHeader
+        title="ภาพรวม"
+        subtitle={formatDateLong(todayISO())}
+        actions={<RangePicker value={rangeValue} onChange={setRangeValue} className="w-full sm:w-auto sm:justify-end" />}
+      />
 
-      <RangePicker value={rangeValue} onChange={setRangeValue} />
-      {rangeLabel && <p className="-mt-2 px-1 text-xs text-slate-500">ช่วง {rangeLabel}</p>}
+      <div className="grid gap-4 lg:grid-cols-12 lg:gap-5">
+        {/* ยอดรวม + กระเป๋า */}
+        <section className="relative overflow-hidden rounded-3xl bg-hero p-5 text-on-hero lg:col-span-5 lg:row-span-2 lg:p-6">
+          <div
+            className="pointer-events-none absolute -top-16 -right-16 h-56 w-56 rounded-full bg-brand/25 blur-3xl"
+            aria-hidden
+          />
+          <div className="relative">
+            <div className="text-sm opacity-75">ยอดคงเหลือรวม</div>
+            <div className="num mt-1 text-4xl font-bold tracking-tight lg:text-[2.75rem]">{formatBaht(data.total)}</div>
+            <div className="mt-1 text-xs opacity-60">{data.wallets.length} กระเป๋า</div>
 
-      <div className="grid grid-cols-2 gap-2">
-        <Stat label="รายรับ" value={sum.income} tone="text-emerald-700" icon="↓" />
-        <Stat label="รายจ่าย" value={sum.expense} tone="text-red-700" icon="↑" />
-        <div className="card col-span-2 flex items-baseline justify-between p-3">
-          <span className="text-sm text-slate-600">
-            {sum.net < 0 ? 'สุทธิ (จ่ายมากกว่ารับ)' : 'สุทธิ (รับ − จ่าย)'}
-          </span>
-          <span className={`text-lg font-bold tabular-nums ${sum.net < 0 ? 'text-red-700' : 'text-slate-900'}`}>
-            {formatBaht(sum.net, { sign: true })}
-          </span>
+            <ul className="no-scrollbar -mx-5 mt-5 flex gap-2 overflow-x-auto px-5 lg:mx-0 lg:mt-6 lg:block lg:space-y-1 lg:overflow-visible lg:px-0">
+              {data.wallets.map((w) => {
+                const bal = data.balances.get(w.id) ?? 0
+                return (
+                  <li
+                    key={w.id}
+                    className="flex min-w-40 shrink-0 flex-col gap-2 rounded-2xl bg-white/8 p-3 lg:min-w-0 lg:flex-row lg:items-center lg:gap-3 lg:rounded-xl lg:bg-transparent lg:px-2 lg:py-2 lg:hover:bg-white/5"
+                  >
+                    <WalletIcon wallet={w} size="sm" />
+                    <span className="min-w-0 flex-1 truncate text-sm opacity-85">{w.name}</span>
+                    <span className={`num font-semibold ${bal < 0 ? 'text-expense' : ''}`}>{formatBaht(bal)}</span>
+                  </li>
+                )
+              })}
+            </ul>
+            <button
+              type="button"
+              onClick={() => onNavigate('wallets')}
+              className="mt-3 hidden items-center gap-1 rounded-lg px-2 py-1 text-sm opacity-75 hover:bg-white/5 hover:opacity-100 lg:inline-flex"
+            >
+              จัดการกระเป๋า <ChevronRight size={16} aria-hidden />
+            </button>
+          </div>
+        </section>
+
+        {/* ตัวเลขสรุป */}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:col-span-7 lg:gap-4">
+          <StatTile
+            label="รายรับ"
+            value={formatBaht(sum.income)}
+            tone="bg-income-soft text-income"
+            icon={<ArrowDownLeft size={16} strokeWidth={2.4} />}
+          />
+          <StatTile
+            label="รายจ่าย"
+            value={formatBaht(sum.expense)}
+            tone="bg-expense-soft text-expense"
+            icon={<ArrowUpRight size={16} strokeWidth={2.4} />}
+          />
+          <div className="col-span-2 sm:col-span-1">
+            <StatTile
+              label={sum.net < 0 ? 'สุทธิ (จ่ายเกิน)' : 'สุทธิ'}
+              value={<span className={sum.net < 0 ? 'text-expense' : ''}>{formatBaht(sum.net, { sign: true })}</span>}
+              tone="bg-sunken text-ink-2"
+              icon={<Scale size={16} strokeWidth={2.2} />}
+              hint={`${count} รายการรับ-จ่าย`}
+            />
+          </div>
         </div>
+
+        {/* กราฟรายวัน */}
+        <section className="card lg:col-span-7">
+          <CardHeader
+            title="รายจ่ายรายวัน"
+            subtitle={dailyIsSelected ? rangeLabel(daily.range) : `30 วันล่าสุด · ${rangeLabel(daily.range)}`}
+          />
+          <div className="px-5 pt-3 pb-5">
+            <DailyExpenseChart transactions={daily.txs} range={daily.range} />
+          </div>
+        </section>
+
+        {/* หมวดหมู่ */}
+        <section className="card lg:col-span-5">
+          <CardHeader title="รายจ่ายตามหมวด" subtitle={rangeLabel(range)} />
+          <div className="px-5 pb-5">
+            {byCat.length === 0 ? (
+              <p className="py-6 text-center text-sm text-muted">ไม่มีรายจ่ายในช่วงนี้</p>
+            ) : (
+              <CategoryBars totals={byCat} total={sum.expense} data={data} />
+            )}
+          </div>
+        </section>
+
+        {/* รายการล่าสุด */}
+        <section className="card overflow-hidden lg:col-span-7">
+          <CardHeader
+            title="รายการล่าสุด"
+            subtitle={rangeLabel(range)}
+            action={
+              <button
+                className="-mr-2 inline-flex items-center gap-0.5 rounded-lg px-2 py-1 text-sm font-medium text-brand hover:bg-brand-soft"
+                onClick={() => onNavigate('history')}
+              >
+                ดูทั้งหมด <ChevronRight size={16} aria-hidden />
+              </button>
+            }
+          />
+          {recent.length === 0 ? (
+            <EmptyState icon={ReceiptText} title="ยังไม่มีรายการในช่วงนี้">
+              กดปุ่ม + เพื่อจดรายการแรก
+            </EmptyState>
+          ) : (
+            <TransactionList transactions={recent} data={data} onOpen={onOpen} flat />
+          )}
+        </section>
       </div>
-
-      <section className="card">
-        <h2 className="mb-3 font-semibold">รายจ่ายตามหมวด</h2>
-        {byCat.length === 0 ? (
-          <p className="text-sm text-slate-500">ไม่มีรายจ่ายในช่วงนี้</p>
-        ) : (
-          <ul className="space-y-3">
-            {byCat.map((c) => {
-              const cat = c.categoryId ? data.categoryMap.get(c.categoryId) : undefined
-              const pct = sum.expense ? Math.round((c.amount / sum.expense) * 100) : 0
-              return (
-                <li key={c.categoryId ?? 'none'}>
-                  <div className="flex justify-between gap-2 text-sm">
-                    <span className="truncate">
-                      <span aria-hidden>{cat?.icon ?? '❔'}</span> {cat?.name ?? 'ไม่ระบุหมวด'}
-                    </span>
-                    <span className="shrink-0 tabular-nums">
-                      {formatBaht(c.amount)} <span className="text-slate-500">({pct}%)</span>
-                    </span>
-                  </div>
-                  <div className="mt-1 h-2 rounded bg-slate-100" aria-hidden>
-                    <div
-                      className="h-2 rounded bg-rose-500"
-                      style={{ width: `${Math.max(2, (c.amount / maxCat) * 100)}%` }}
-                    />
-                  </div>
-                </li>
-              )
-            })}
-          </ul>
-        )}
-      </section>
-
-      <section>
-        <div className="mb-2 flex items-center justify-between px-1">
-          <h2 className="font-semibold">รายการล่าสุดในช่วงนี้</h2>
-          <button className="text-sm font-medium text-teal-700" onClick={onSeeAll}>
-            ดูทั้งหมด →
-          </button>
-        </div>
-        {recent.length === 0 ? (
-          <p className="card text-center text-slate-500">ยังไม่มีรายการในช่วงนี้ กดปุ่ม + เพื่อจด</p>
-        ) : (
-          <TransactionList transactions={recent} data={data} onOpen={onOpen} />
-        )}
-      </section>
-    </div>
+    </>
   )
 }

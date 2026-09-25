@@ -1,3 +1,4 @@
+import { Trash2 } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import type { AppData } from '../hooks/useData'
 import { addTransaction, deleteTransaction, updateTransaction } from '../lib/db'
@@ -6,7 +7,7 @@ import { TX_META } from '../lib/labels'
 import { amountToInput, formatBaht, parseAmount } from '../lib/money'
 import { getPref, setPref } from '../lib/prefs'
 import type { Transaction, TransactionType, Wallet } from '../lib/types'
-import { errorMessage, Sheet, useConfirm, useToast } from './ui'
+import { errorMessage, FormError, Sheet, useConfirm, useToast, WalletIcon } from './ui'
 
 function WalletPicker({
   label,
@@ -26,7 +27,7 @@ function WalletPicker({
   return (
     <fieldset>
       <legend className="label">{label}</legend>
-      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+      <div className="no-scrollbar -mx-5 flex gap-2 overflow-x-auto px-5 pb-1 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0">
         {wallets.map((w) => {
           const selected = value === w.id
           const disabled = disabledId === w.id
@@ -37,13 +38,15 @@ function WalletPicker({
               disabled={disabled}
               aria-pressed={selected}
               onClick={() => onChange(w.id)}
-              className={`min-h-12 shrink-0 rounded-xl border px-3 py-1 text-left disabled:opacity-40 ${
-                selected ? 'border-2 font-semibold' : 'border-slate-300'
+              className={`flex min-h-14 shrink-0 items-center gap-2.5 rounded-xl border px-3 py-2 text-left transition-colors disabled:opacity-35 ${
+                selected ? 'border-brand bg-brand-soft ring-1 ring-brand' : 'border-line hover:bg-sunken'
               }`}
-              style={selected ? { borderColor: w.color, backgroundColor: w.color + '14' } : undefined}
             >
-              <div className="text-sm">{w.name}</div>
-              <div className="text-xs tabular-nums text-slate-500">{formatBaht(balances.get(w.id) ?? 0)}</div>
+              <WalletIcon wallet={w} size="sm" />
+              <span className="min-w-0">
+                <span className={`block truncate text-sm ${selected ? 'font-semibold' : 'font-medium'}`}>{w.name}</span>
+                <span className="num block text-xs text-muted">{formatBaht(balances.get(w.id) ?? 0)}</span>
+              </span>
             </button>
           )
         })}
@@ -146,38 +149,60 @@ export function TransactionForm({
     }
   }
 
+
   const meta = TX_META[type]
 
   return (
-    <Sheet title={transaction ? 'แก้ไขรายการ' : 'เพิ่มรายการ'} onClose={onClose}>
-      <form onSubmit={submit} className="space-y-4">
-        <div role="radiogroup" aria-label="ประเภทรายการ" className="grid grid-cols-3 gap-1 rounded-xl bg-slate-100 p-1">
-          {(['expense', 'income', 'transfer'] as TransactionType[]).map((t) => (
-            <button
-              key={t}
-              type="button"
-              role="radio"
-              aria-checked={type === t}
-              onClick={() => changeType(t)}
-              disabled={t === 'transfer' && wallets.length < 2}
-              className={`min-h-11 rounded-lg font-semibold disabled:opacity-40 ${
-                type === t ? `${TX_META[t].activeBg} text-white shadow` : 'text-slate-600'
-              }`}
-            >
-              {TX_META[t].icon} {TX_META[t].label}
+    <Sheet
+      title={transaction ? 'แก้ไขรายการ' : 'จดรายการ'}
+      onClose={onClose}
+      wide
+      footer={
+        <div className="flex gap-3">
+          {transaction && (
+            <button type="button" className="btn-secondary text-expense" onClick={remove} aria-label="ลบรายการนี้">
+              <Trash2 size={18} aria-hidden />
+              <span className="hidden sm:inline">ลบ</span>
             </button>
-          ))}
+          )}
+          <button type="submit" form="tx-form" className={`btn-primary flex-1 text-base`} disabled={saving}>
+            {saving ? 'กำลังบันทึก…' : `บันทึก${meta.label}`}
+          </button>
+        </div>
+      }
+    >
+      <form id="tx-form" onSubmit={submit} className="space-y-5">
+        <div role="radiogroup" aria-label="ประเภทรายการ" className="segmented">
+          {(['expense', 'income', 'transfer'] as TransactionType[]).map((t) => {
+            const M = TX_META[t]
+            return (
+              <button
+                key={t}
+                type="button"
+                role="radio"
+                aria-checked={type === t}
+                onClick={() => changeType(t)}
+                disabled={t === 'transfer' && wallets.length < 2}
+                className="inline-flex min-h-10! items-center justify-center gap-1.5 font-semibold! disabled:opacity-40"
+              >
+                <M.Icon size={16} strokeWidth={2.4} className={type === t ? M.text : ''} aria-hidden />
+                {M.label}
+              </button>
+            )
+          })}
         </div>
 
-        <div>
-          <label className="label" htmlFor="t-amount">
+        <div className={`rounded-2xl px-4 py-4 ${meta.soft}`}>
+          <label className="text-sm font-medium text-ink-2" htmlFor="t-amount">
             จำนวนเงิน (บาท)
           </label>
-          <div className="relative">
-            <span className={`absolute top-1/2 left-3 -translate-y-1/2 text-2xl ${meta.text}`}>฿</span>
+          <div className="mt-1 flex items-baseline gap-2">
+            <span className={`text-3xl font-semibold ${meta.text}`} aria-hidden>
+              ฿
+            </span>
             <input
               id="t-amount"
-              className={`field h-16 pl-10 text-3xl font-bold tabular-nums ${meta.text}`}
+              className={`num w-full min-w-0 bg-transparent text-4xl font-bold tracking-tight placeholder:text-ink/20 focus:outline-none ${meta.text}`}
               inputMode="decimal"
               autoComplete="off"
               autoFocus={!transaction}
@@ -213,29 +238,34 @@ export function TransactionForm({
 
         {type !== 'transfer' && (
           <fieldset>
-            <legend className="label">หมวดหมู่ (ไม่บังคับ)</legend>
-            <div className="grid grid-cols-4 gap-2">
-              {cats.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  aria-pressed={categoryId === c.id}
-                  onClick={() => setCategoryId(categoryId === c.id ? '' : c.id)}
-                  className={`flex min-h-16 flex-col items-center justify-center rounded-xl border px-1 text-xs ${
-                    categoryId === c.id ? 'border-2 border-teal-700 bg-teal-50 font-semibold' : 'border-slate-200'
-                  }`}
-                >
-                  <span className="text-xl" aria-hidden>
-                    {c.icon}
-                  </span>
-                  <span className="line-clamp-1">{c.name}</span>
-                </button>
-              ))}
+            <legend className="label">
+              หมวดหมู่ <span className="font-normal text-muted">(ไม่บังคับ)</span>
+            </legend>
+            <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
+              {cats.map((c) => {
+                const on = categoryId === c.id
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => setCategoryId(on ? '' : c.id)}
+                    className={`flex min-h-[4.25rem] flex-col items-center justify-center gap-1 rounded-xl border px-1 text-xs transition-colors ${
+                      on ? 'border-brand bg-brand-soft font-semibold text-brand' : 'border-line text-ink-2 hover:bg-sunken'
+                    }`}
+                  >
+                    <span className="text-xl" aria-hidden>
+                      {c.icon}
+                    </span>
+                    <span className="line-clamp-1">{c.name}</span>
+                  </button>
+                )
+              })}
             </div>
           </fieldset>
         )}
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid gap-3 sm:grid-cols-[11rem_1fr]">
           <div>
             <label className="label" htmlFor="t-date">
               วันที่
@@ -251,40 +281,27 @@ export function TransactionForm({
           </div>
           <div>
             <label className="label" htmlFor="t-note">
-              รายละเอียด
+              รายละเอียด <span className="font-normal text-muted">(ไม่บังคับ)</span>
             </label>
             <input
               id="t-note"
               className="field"
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="ไม่บังคับ"
+              placeholder="เช่น ข้าวกลางวัน"
               maxLength={200}
             />
           </div>
         </div>
 
-        {error && (
-          <p role="alert" className="whitespace-pre-line rounded-lg bg-red-50 p-3 text-sm text-red-800">
-            ⚠️ {error}
-          </p>
-        )}
-
-        <button type="submit" className="btn-primary w-full text-lg" disabled={saving}>
-          {saving ? 'กำลังบันทึก…' : 'บันทึก'}
-        </button>
+        {error && <FormError>{error}</FormError>}
 
         {transaction && (
-          <>
-            <button type="button" className="btn-secondary w-full text-red-700" onClick={remove}>
-              ลบรายการนี้
-            </button>
-            <p className="text-center text-xs text-slate-500">
-              บันทึกเมื่อ {formatTimestamp(transaction.createdAt)}
-              {transaction.updatedAt !== transaction.createdAt &&
-                ` · แก้ไขล่าสุด ${formatTimestamp(transaction.updatedAt)}`}
-            </p>
-          </>
+          <p className="text-center text-xs text-muted">
+            บันทึกเมื่อ {formatTimestamp(transaction.createdAt)}
+            {transaction.updatedAt !== transaction.createdAt &&
+              ` · แก้ไขล่าสุด ${formatTimestamp(transaction.updatedAt)}`}
+          </p>
         )}
       </form>
     </Sheet>

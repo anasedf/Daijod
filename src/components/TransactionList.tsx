@@ -4,43 +4,56 @@ import { TX_META } from '../lib/labels'
 import { formatBaht } from '../lib/money'
 import type { Transaction } from '../lib/types'
 
+export function TxIcon({ tx, data }: { tx: Transaction; data: AppData }) {
+  const meta = TX_META[tx.type]
+  const cat = tx.categoryId ? data.categoryMap.get(tx.categoryId) : undefined
+  return (
+    <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg ${meta.soft}`} aria-hidden>
+      {tx.type !== 'transfer' && cat ? cat.icon : <meta.Icon size={18} className={meta.text} strokeWidth={2.2} />}
+    </span>
+  )
+}
+
 function TransactionRow({ tx, data, onOpen }: { tx: Transaction; data: AppData; onOpen: (t: Transaction) => void }) {
   const meta = TX_META[tx.type]
   const cat = tx.categoryId ? data.categoryMap.get(tx.categoryId) : undefined
-  const src = tx.sourceWalletId ? data.walletMap.get(tx.sourceWalletId)?.name : undefined
-  const dst = tx.destinationWalletId ? data.walletMap.get(tx.destinationWalletId)?.name : undefined
+  const src = tx.sourceWalletId ? data.walletMap.get(tx.sourceWalletId) : undefined
+  const dst = tx.destinationWalletId ? data.walletMap.get(tx.destinationWalletId) : undefined
 
   const title = tx.type === 'transfer' ? 'โอนเงิน' : cat?.name ?? meta.label
-  const walletText = tx.type === 'transfer' ? `${src} → ${dst}` : tx.type === 'income' ? dst : src
+  const walletText = tx.type === 'transfer' ? `${src?.name} → ${dst?.name}` : (tx.type === 'income' ? dst : src)?.name
+  const walletColor = (tx.type === 'income' ? dst : src)?.color
 
   return (
     <li>
       <button
         type="button"
         onClick={() => onOpen(tx)}
-        className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-slate-50"
+        className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-sunken/60 md:grid-cols-[auto_minmax(0,1.3fr)_minmax(0,1fr)_auto] md:px-5"
       >
-        <span
-          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-lg ${meta.bg}`}
-          aria-hidden
-        >
-          {tx.type === 'transfer' ? meta.icon : cat?.icon ?? meta.icon}
-        </span>
-        <span className="min-w-0 flex-1">
+        <TxIcon tx={tx} data={data} />
+        <span className="min-w-0">
           <span className="block truncate font-medium">{title}</span>
-          <span className="block truncate text-xs text-slate-500">
-            {walletText}
-            {tx.note && ` · ${tx.note}`}
+          <span className="block truncate text-sm text-muted">
+            <span className="md:hidden">
+              {walletText}
+              {tx.note && ' · '}
+            </span>
+            {tx.note || <span className="hidden md:inline">—</span>}
           </span>
         </span>
-        <span className="shrink-0 text-right">
-          <span className={`block font-semibold tabular-nums ${meta.text}`}>
+        <span className="hidden min-w-0 items-center gap-2 text-sm text-ink-2 md:flex">
+          {tx.type !== 'transfer' && (
+            <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: walletColor }} aria-hidden />
+          )}
+          <span className="truncate">{walletText}</span>
+        </span>
+        <span className="text-right">
+          <span className={`num block font-semibold ${tx.type === 'transfer' ? 'text-ink-2' : meta.text}`}>
             {meta.sign}
             {formatBaht(tx.amount)}
           </span>
-          <span className={`block text-xs ${meta.text}`}>
-            {meta.icon} {meta.label}
-          </span>
+          <span className="block text-xs text-muted">{meta.label}</span>
         </span>
       </button>
     </li>
@@ -52,10 +65,13 @@ export function TransactionList({
   transactions,
   data,
   onOpen,
+  flat = false,
 }: {
   transactions: Transaction[]
   data: AppData
   onOpen: (t: Transaction) => void
+  /** ไม่ใส่กรอบการ์ด (ใช้ภายในการ์ดอื่น) */
+  flat?: boolean
 }) {
   const groups: { date: string; items: Transaction[] }[] = []
   for (const tx of transactions) {
@@ -65,17 +81,17 @@ export function TransactionList({
   }
 
   return (
-    <div className="space-y-3">
+    <div className={flat ? '' : 'space-y-4'}>
       {groups.map((g) => {
         let net = 0
         for (const t of g.items) net += t.type === 'income' ? t.amount : t.type === 'expense' ? -t.amount : 0
         return (
-          <section key={g.date} className="overflow-hidden rounded-2xl bg-white shadow-sm">
-            <h3 className="flex justify-between border-b border-slate-100 px-4 py-2 text-sm font-semibold text-slate-600">
+          <section key={g.date} className={flat ? '' : 'card overflow-hidden'}>
+            <h3 className="flex justify-between bg-sunken/50 px-4 py-2 text-xs font-semibold text-muted md:px-5">
               <span>{dayHeading(g.date)}</span>
-              {net !== 0 && <span className="tabular-nums">{formatBaht(net, { sign: true })}</span>}
+              {net !== 0 && <span className="num">{formatBaht(net, { sign: true })}</span>}
             </h3>
-            <ul className="divide-y divide-slate-100">
+            <ul className="divide-y divide-line/70">
               {g.items.map((tx) => (
                 <TransactionRow key={tx.id} tx={tx} data={data} onOpen={onOpen} />
               ))}
