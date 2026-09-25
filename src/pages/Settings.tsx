@@ -430,7 +430,7 @@ export function SettingsPage({ data }: { data: AppData }) {
               <h2 className="card-title">นำเข้าจาก statement</h2>
             </div>
             <p className="mt-3 text-sm text-ink-2">
-              อ่านรายการจากไฟล์ statement ของธนาคาร (ตอนนี้รองรับกสิกรไทย) แล้วตรวจก่อนบันทึก ไฟล์ถูกอ่านในเครื่องนี้เท่านั้น
+              อ่านรายการจากไฟล์ statement (กสิกรไทย, TrueMoney) แล้วตรวจก่อนบันทึก ไฟล์ถูกอ่านในเครื่องนี้เท่านั้น
             </p>
             <button className="btn-secondary mt-4 w-full" onClick={() => setImporting(true)} disabled={data.wallets.length === 0}>
               <FileUp size={18} aria-hidden /> เลือกไฟล์ statement

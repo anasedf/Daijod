@@ -2,6 +2,7 @@
 import { getPref, setPref } from '../prefs'
 import type { Category, Wallet } from '../types'
 import type { StatementTx } from './kbank'
+import { describeTrueMoneyDetail } from './truemoney'
 
 export type Choice = { type: 'expense' | 'income'; categoryId: string } | { type: 'transfer'; walletId: string }
 
@@ -23,6 +24,12 @@ const squash = (s: string) => s.toLowerCase().replace(/[\s.,_-]/g, '')
 export function counterparty(tx: StatementTx): Counterparty {
   if (tx.kind === 'รับดอกเบี้ยเงินฝาก') return { name: 'ดอกเบี้ยเงินฝาก', key: 'interest' }
   if (isCashDeposit(tx)) return { name: 'ฝากเงินสด', key: 'cash-deposit' }
+
+  // รหัสของ TrueMoney เช่น debit_kbank, prepaidcard_master
+  if (tx.channel === 'TrueMoney') {
+    const named = describeTrueMoneyDetail(tx.detail)
+    if (named) return { name: named, key: `tm|${tx.detail.split(/[\s_]/).slice(0, 2).join('_').toLowerCase()}` }
+  }
 
   const edc = /EDC(\d+)/.exec(tx.detail)
   if (tx.kind === 'ชำระด้วยบัตรเดบิต' || edc) {

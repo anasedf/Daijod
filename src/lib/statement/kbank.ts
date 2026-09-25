@@ -27,7 +27,7 @@ export interface StatementSummary {
 }
 
 export interface Statement {
-  bank: 'kbank'
+  bank: 'kbank' | 'truemoney'
   accountNo: string
   period?: { from: string; to: string }
   closingBalance?: number

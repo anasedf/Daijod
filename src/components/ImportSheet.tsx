@@ -5,12 +5,14 @@ import { importTransactions, updateWallet, UserError } from '../lib/db'
 import { formatDateShort } from '../lib/dates'
 import { effectOn } from '../lib/ledger'
 import { formatBaht } from '../lib/money'
+import { BANK_LABEL, parseStatement, SUPPORTED_BANKS } from '../lib/statement'
 import { counterparty, rememberChoices, suggestChoice, type Choice } from '../lib/statement/classify'
-import { isKBankStatement, parseKBank, type Statement, type StatementTx } from '../lib/statement/kbank'
+import type { Statement, StatementTx } from '../lib/statement/kbank'
+import { findMatchingTransfer } from '../lib/statement/match'
 import type { TransactionInput } from '../lib/types'
 import { errorMessage, FormError, Sheet, useToast } from './ui'
 
-type Status = 'new' | 'imported' | 'similar'
+type Status = 'new' | 'imported' | 'similar' | 'matched'
 
 interface Row {
   tx: StatementTx
@@ -31,13 +33,20 @@ function decode(v: string): Choice {
 
 function buildRows(statement: Statement, data: AppData, walletId: string): Row[] {
   const imported = new Set(data.transactions.map((t) => t.importKey).filter(Boolean))
+  const usedTransfers = new Set<string>()
   return statement.transactions.map((tx) => {
     const cp = counterparty(tx)
-    const choice = suggestChoice(tx, cp, { walletId, wallets: data.wallets, categories: data.categories })
+    let choice = suggestChoice(tx, cp, { walletId, wallets: data.wallets, categories: data.categories })
     const sign = tx.direction === 'in' ? 1 : -1
     let status: Status = 'new'
+    const matched = imported.has(tx.key) ? undefined : findMatchingTransfer(tx, walletId, data.transactions, usedTransfers)
     if (imported.has(tx.key)) status = 'imported'
-    else if (
+    else if (matched) {
+      // การโอนระหว่างกระเป๋าของเราที่นำเข้าจากอีกฝั่งไปแล้ว ไม่ต้องบันทึกซ้ำ
+      status = 'matched'
+      const other = tx.direction === 'in' ? matched.sourceWalletId! : matched.destinationWalletId!
+      choice = { type: 'transfer', walletId: other }
+    } else if (
       data.transactions.some(
         (t) => !t.importKey && t.date === tx.date && t.amount === tx.amount && Math.sign(effectOn(t, walletId)) === sign,
       )
@@ -61,7 +70,18 @@ function toInput(row: Row, walletId: string): TransactionInput {
     : { ...base, type: 'expense', categoryId, sourceWalletId: walletId }
 }
 
-const STATUS_LABEL: Record<Status, string> = { new: '', imported: 'นำเข้าแล้ว', similar: 'อาจซ้ำกับที่จดไว้' }
+const STATUS_LABEL: Record<Status, string> = {
+  new: '',
+  imported: 'นำเข้าแล้ว',
+  similar: 'อาจซ้ำกับที่จดไว้',
+  matched: 'ตรงกับโอนที่มีอยู่แล้ว',
+}
+
+/** เดากระเป๋าที่น่าจะเป็นบัญชีของ statement นี้ จากชื่อกระเป๋า */
+function guessWallet(bank: Statement['bank'], wallets: AppData['wallets']): string | undefined {
+  const re = bank === 'truemoney' ? /true|ทรู/i : /กสิกร|kbank|kplus|k plus/i
+  return wallets.find((w) => re.test(w.name))?.id
+}
 
 export function ImportSheet({ data, onClose, walletId: initialWallet }: { data: AppData; onClose: () => void; walletId?: string }) {
   const toast = useToast()
@@ -95,13 +115,17 @@ export function ImportSheet({ data, onClose, walletId: initialWallet }: { data: 
         if (e instanceof PasswordRequired) setNeedPassword(true)
         throw e
       }
-      if (!isKBankStatement(pages)) {
-        throw new UserError('ยังรองรับเฉพาะ statement ของธนาคารกสิกรไทย (PDF ที่ขอจาก K PLUS)')
-      }
-      const st = parseKBank(pages)
+      const st = parseStatement(pages)
       if (st.transactions.length === 0) throw new UserError('ไม่พบรายการในไฟล์นี้')
+      // ถ้ากระเป๋าที่เลือกไว้ไม่ตรงกับธนาคารของไฟล์ แต่มีกระเป๋าที่ชื่อตรง ให้สลับให้เลย
+      let target = walletId
+      const guess = guessWallet(st.bank, data.wallets)
+      if (guess && guess !== walletId && !guessWallet(st.bank, [wallet])) {
+        target = guess
+        setWalletId(guess)
+      }
       setStatement(st)
-      setRows(buildRows(st, data, walletId))
+      setRows(buildRows(st, data, target))
     } catch (e) {
       setError(errorMessage(e))
     } finally {
@@ -169,8 +193,8 @@ export function ImportSheet({ data, onClose, walletId: initialWallet }: { data: 
       >
         <div className="space-y-5">
           <p className="text-sm text-ink-2">
-            รองรับ statement ของ<b className="text-ink">ธนาคารกสิกรไทย</b> (PDF ที่ขอจากแอป K PLUS) ไฟล์ถูกอ่านในเครื่องนี้เท่านั้น
-            ไม่ถูกส่งไปที่ไหน
+            รองรับ statement ของ <b className="text-ink">{SUPPORTED_BANKS}</b> ไฟล์ถูกอ่านในเครื่องนี้เท่านั้น ไม่ถูกส่งไปที่ไหน
+            ถ้านำเข้าทั้งสองฝั่งของบัญชีที่โอนหากัน แอปจะจับคู่การโอนให้ ไม่บันทึกซ้ำ
           </p>
 
           <div>
@@ -295,7 +319,10 @@ export function ImportSheet({ data, onClose, walletId: initialWallet }: { data: 
           <span>
             กระเป๋า <b>{wallet?.name}</b>
           </span>
-          {statement.accountNo && <span className="text-ink-2">บัญชี {statement.accountNo}</span>}
+          <span className="text-ink-2">
+            {BANK_LABEL[statement.bank]}
+            {statement.accountNo && ` ${statement.accountNo}`}
+          </span>
           {statement.period && (
             <span className="text-ink-2">
               {formatDateShort(statement.period.from)} – {formatDateShort(statement.period.to)}
@@ -328,7 +355,7 @@ export function ImportSheet({ data, onClose, walletId: initialWallet }: { data: 
             />
             เลือกทั้งหมด
           </label>
-          <span className="text-xs text-muted">รายการที่นำเข้าแล้วหรืออาจซ้ำจะไม่ถูกเลือกไว้ก่อน</span>
+          <span className="text-xs text-muted">รายการที่นำเข้าแล้ว ตรงกับโอนที่มีอยู่ หรืออาจซ้ำ จะไม่ถูกเลือกไว้ก่อน</span>
         </div>
 
         <ul className="divide-y divide-line/70 rounded-xl border border-line">
