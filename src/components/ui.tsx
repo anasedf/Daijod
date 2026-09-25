@@ -191,13 +191,18 @@ export function FormError({ children }: { children: ReactNode }) {
 // ---------- Toast (ข้อความแจ้งผลสั้น ๆ) ----------
 
 type ToastKind = 'success' | 'error'
+interface ToastAction {
+  label: string
+  onClick: () => void
+}
 interface ToastState {
   id: number
   message: string
   kind: ToastKind
+  action?: ToastAction
 }
 
-const ToastContext = createContext<(message: string, kind?: ToastKind) => void>(() => {})
+const ToastContext = createContext<(message: string, kind?: ToastKind, action?: ToastAction) => void>(() => {})
 
 export function useToast() {
   return useContext(ToastContext)
@@ -221,13 +226,13 @@ export function UIProvider({ children }: { children: ReactNode }) {
   const [toast, setToast] = useState<ToastState | null>(null)
   const [confirm, setConfirm] = useState<(ConfirmOptions & { resolve: (v: boolean) => void }) | null>(null)
 
-  const showToast = useCallback((message: string, kind: ToastKind = 'success') => {
-    setToast({ id: Date.now(), message, kind })
+  const showToast = useCallback((message: string, kind: ToastKind = 'success', action?: ToastAction) => {
+    setToast({ id: Date.now(), message, kind, action })
   }, [])
 
   useEffect(() => {
     if (!toast) return
-    const t = setTimeout(() => setToast(null), toast.kind === 'error' ? 5000 : 2500)
+    const t = setTimeout(() => setToast(null), toast.kind === 'error' || toast.action ? 5000 : 2500)
     return () => clearTimeout(t)
   }, [toast])
 
@@ -278,14 +283,26 @@ export function UIProvider({ children }: { children: ReactNode }) {
             <div
               key={toast.id}
               role={toast.kind === 'error' ? 'alert' : 'status'}
-              className="anim-sheet flex max-w-sm items-start gap-2 rounded-xl bg-ink px-4 py-3 text-sm font-medium whitespace-pre-line text-canvas shadow-xl"
+              className="anim-sheet pointer-events-auto flex max-w-sm items-start gap-2 rounded-xl bg-ink px-4 py-3 text-sm font-medium whitespace-pre-line text-canvas shadow-xl"
             >
               {toast.kind === 'error' ? (
                 <CircleAlert size={18} className="mt-0.5 shrink-0 text-expense" aria-hidden />
               ) : (
                 <CircleCheck size={18} className="mt-0.5 shrink-0 text-brand" aria-hidden />
               )}
-              {toast.message}
+              <span className="flex-1">{toast.message}</span>
+              {toast.action && (
+                <button
+                  type="button"
+                  className="-my-1 -mr-2 shrink-0 rounded-lg px-2 py-1 font-semibold text-brand hover:bg-white/10"
+                  onClick={() => {
+                    setToast(null)
+                    toast.action!.onClick()
+                  }}
+                >
+                  {toast.action.label}
+                </button>
+              )}
             </div>
           )}
         </div>

@@ -1,15 +1,89 @@
-import { ArrowDownLeft, ArrowUpRight, ChevronRight, ReceiptText, Scale, Wallet } from 'lucide-react'
+import { ArrowDownLeft, ArrowUpRight, ChevronRight, ReceiptText, Scale, Wallet, Zap } from 'lucide-react'
 import { useMemo, useState, type ReactNode } from 'react'
 import type { Tab } from '../App'
 import { CategoryBars, DailyExpenseChart } from '../components/Charts'
 import { defaultRange, RangePicker, rangeLabel, resolveRange } from '../components/RangePicker'
 import { TransactionList } from '../components/TransactionList'
-import { EmptyState, PageHeader, WalletIcon } from '../components/ui'
+import { CategoryIcon, EmptyState, errorMessage, PageHeader, useToast, WalletIcon } from '../components/ui'
 import type { AppData } from '../hooks/useData'
 import { formatDateLong, todayISO, toISODate, type DateRange } from '../lib/dates'
+import { addTransaction, db } from '../lib/db'
 import { expenseByCategory, filterTransactions, sortNewestFirst, summarize } from '../lib/ledger'
 import { formatBaht } from '../lib/money'
+import { suggestQuickAdds, type QuickAdd } from '../lib/quick'
 import type { Transaction } from '../lib/types'
+
+/** ปุ่มลัด: รายการที่จดบ่อย แตะเดียวบันทึกเลย (แก้ได้จากปุ่มบน toast) */
+function QuickAdds({ data, onOpen }: { data: AppData; onOpen: (t: Transaction) => void }) {
+  const toast = useToast()
+  const [busy, setBusy] = useState<string | null>(null)
+  const items = useMemo(() => suggestQuickAdds(data.transactions, { today: todayISO() }), [data.transactions])
+  const valid = items.filter((q) => data.walletMap.has(q.walletId))
+  if (valid.length === 0) return null
+
+  async function add(q: QuickAdd) {
+    setBusy(q.key)
+    try {
+      const id = await addTransaction({
+        type: q.type,
+        amount: q.amount,
+        date: todayISO(),
+        note: q.note,
+        categoryId: q.categoryId,
+        sourceWalletId: q.type === 'expense' ? q.walletId : undefined,
+        destinationWalletId: q.type === 'income' ? q.walletId : undefined,
+      })
+      toast(`บันทึก ${q.note || data.categoryMap.get(q.categoryId ?? '')?.name} ${formatBaht(q.amount)} แล้ว`, 'success', {
+        label: 'แก้ไข',
+        onClick: async () => {
+          const t = await db.transactions.get(id)
+          if (t) onOpen(t)
+        },
+      })
+    } catch (e) {
+      toast(errorMessage(e), 'error')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  return (
+    <section aria-label="จดเร็ว" className="lg:col-span-12">
+      <div className="mb-2 flex items-center gap-1.5 px-1 text-sm font-medium text-ink-2">
+        <Zap size={16} className="text-brand" aria-hidden /> จดเร็ว
+        <span className="text-xs font-normal text-muted">· แตะเพื่อจดเป็นของวันนี้</span>
+      </div>
+      <ul className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0">
+        {valid.map((q) => {
+          const cat = q.categoryId ? data.categoryMap.get(q.categoryId) : undefined
+          const wallet = data.walletMap.get(q.walletId)!
+          return (
+            <li key={q.key} className="shrink-0">
+              <button
+                type="button"
+                disabled={busy !== null}
+                onClick={() => add(q)}
+                className="card flex items-center gap-2.5 py-2 pr-3.5 pl-2 text-left transition-colors hover:border-brand/40 hover:bg-sunken disabled:opacity-60"
+              >
+                <CategoryIcon category={cat} size="sm" fallback={q.type === 'income' ? '+' : '−'} />
+                <span className="min-w-0">
+                  <span className="block max-w-36 truncate text-sm font-medium">{q.note || cat?.name}</span>
+                  <span className="block text-xs text-muted">
+                    <span className={`num ${q.type === 'income' ? 'text-income' : ''}`}>
+                      {q.type === 'income' ? '+' : '−'}
+                      {formatBaht(q.amount)}
+                    </span>{' '}
+                    · {wallet.name}
+                  </span>
+                </span>
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+    </section>
+  )
+}
 
 function StatTile({
   label,
@@ -121,6 +195,8 @@ export function DashboardPage({
       />
 
       <div className="grid gap-4 lg:grid-cols-12 lg:gap-5">
+        <QuickAdds data={data} onOpen={onOpen} />
+
         {/* ยอดรวม + กระเป๋า */}
         <section className="relative overflow-hidden rounded-3xl bg-hero p-5 text-on-hero lg:col-span-5 lg:row-span-2 lg:p-6">
           <div
