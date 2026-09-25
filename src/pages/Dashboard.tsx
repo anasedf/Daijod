@@ -1,7 +1,7 @@
 import { ArrowDownLeft, ArrowUpRight, ChevronRight, Download, HardDrive, ReceiptText, Scale, Wallet, Zap } from 'lucide-react'
 import { useMemo, useState, type ReactNode } from 'react'
 import type { Tab } from '../App'
-import { CategoryBars, DailyExpenseChart } from '../components/Charts'
+import { CategoryBars, DailyExpenseChart, MonthlyChart } from '../components/Charts'
 import { defaultRange, RangePicker, rangeLabel, resolveRange } from '../components/RangePicker'
 import { TransactionList } from '../components/TransactionList'
 import { CategoryIcon, EmptyState, errorMessage, PageHeader, useToast, WalletIcon } from '../components/ui'
@@ -13,7 +13,62 @@ import { addTransaction, db } from '../lib/db'
 import { expenseByCategory, filterTransactions, sortNewestFirst, summarize } from '../lib/ledger'
 import { formatBaht } from '../lib/money'
 import { suggestQuickAdds, type QuickAdd } from '../lib/quick'
+import { compareMonths, monthLabel, monthlyTotals } from '../lib/trend'
 import type { Transaction } from '../lib/types'
+
+/** 6 เดือนย้อนหลัง + เดือนนี้เทียบเดือนก่อน */
+function TrendCard({ data }: { data: AppData }) {
+  const { months, cmp } = useMemo(() => {
+    const today = todayISO()
+    return { months: monthlyTotals(data.transactions, today, 6), cmp: compareMonths(data.transactions, data.categoryMap, today) }
+  }, [data])
+  if (months.every((m) => m.income === 0 && m.expense === 0)) return null
+
+  const up = cmp.expenseDiff > 0
+  const pct = cmp.expensePct !== null ? `${Math.abs(Math.round(cmp.expensePct * 100))}%` : null
+  const name = (c: typeof cmp.biggestIncrease) => c?.category?.name ?? 'ไม่ระบุหมวด'
+
+  return (
+    <section className="card lg:col-span-7">
+      <CardHeader title="6 เดือนย้อนหลัง" subtitle={`${monthLabel(months[0].month, true)} – ${monthLabel(months.at(-1)!.month, true)}`} />
+      <div className="px-5 pt-3 pb-5">
+        <MonthlyChart months={months} />
+        <div className="mt-4 space-y-1.5 border-t border-line pt-3 text-sm">
+          <p>
+            เดือนนี้จ่าย{' '}
+            {cmp.expenseDiff === 0 ? (
+              'เท่ากับเดือนก่อน'
+            ) : (
+              <>
+                <b className={up ? 'text-expense' : 'text-income'}>
+                  {up ? 'มากกว่า' : 'น้อยกว่า'}เดือนก่อน {formatBaht(Math.abs(cmp.expenseDiff))}
+                </b>
+                {pct && <span className="text-muted"> ({pct})</span>}
+              </>
+            )}
+          </p>
+          {(cmp.biggestIncrease || cmp.biggestDecrease) && (
+            <p className="text-ink-2">
+              {cmp.biggestIncrease && (
+                <>
+                  เพิ่มมากสุด <b className="text-ink">{name(cmp.biggestIncrease)}</b>{' '}
+                  <span className="num text-expense">+{formatBaht(cmp.biggestIncrease.diff)}</span>
+                </>
+              )}
+              {cmp.biggestIncrease && cmp.biggestDecrease && <span className="text-muted"> · </span>}
+              {cmp.biggestDecrease && (
+                <>
+                  ลดมากสุด <b className="text-ink">{name(cmp.biggestDecrease)}</b>{' '}
+                  <span className="num text-income">−{formatBaht(-cmp.biggestDecrease.diff)}</span>
+                </>
+              )}
+            </p>
+          )}
+        </div>
+      </div>
+    </section>
+  )
+}
 
 /** งบประมาณของเดือนปัจจุบัน: ใช้ไปกี่ % เหลือเท่าไหร่ ควรใช้วันละเท่าไหร่ */
 function BudgetCard({ data, onNavigate }: { data: AppData; onNavigate: (tab: Tab) => void }) {
@@ -402,6 +457,9 @@ export function DashboardPage({
             )}
           </div>
         </section>
+
+        {/* เทียบเดือนต่อเดือน */}
+        <TrendCard data={data} />
 
         {/* งบประมาณเดือนนี้ */}
         <BudgetCard data={data} onNavigate={onNavigate} />

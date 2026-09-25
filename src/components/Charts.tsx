@@ -3,6 +3,7 @@ import type { AppData } from '../hooks/useData'
 import { formatDateShort, toISODate, type DateRange } from '../lib/dates'
 import type { CategoryTotal } from '../lib/ledger'
 import { formatBaht } from '../lib/money'
+import { monthLabel, type MonthTotal } from '../lib/trend'
 import type { Transaction } from '../lib/types'
 import { CategoryIcon } from './ui'
 
@@ -114,6 +115,80 @@ export function DailyExpenseChart({ transactions, range }: { transactions: Trans
           .map((d, i) => (values[i] ? `${formatDateShort(d)} ${formatBaht(values[i])}` : ''))
           .filter(Boolean)
           .join(', ') || 'ไม่มีรายจ่าย'}
+      </figcaption>
+    </figure>
+  )
+}
+
+/** กราฟแท่งคู่ รับ/จ่าย รายเดือน (สองชุด: รายรับเขียว รายจ่ายแดง มีป้ายกำกับ) */
+export function MonthlyChart({ months }: { months: MonthTotal[] }) {
+  const [hover, setHover] = useState<number | null>(null)
+  const max = niceMax(Math.max(...months.map((m) => Math.max(m.income, m.expense))))
+  const ticks = [max, max / 2, 0]
+  const h = hover !== null ? months[hover] : null
+
+  return (
+    <figure className="m-0">
+      <div className="flex gap-2">
+        <div className="num flex h-40 flex-col justify-between text-right text-[0.7rem] text-muted" aria-hidden>
+          {ticks.map((t) => (
+            <span key={t} className="-translate-y-1/2 leading-none first:translate-y-0 last:translate-y-0">
+              {compactBaht(t)}
+            </span>
+          ))}
+        </div>
+        <div className="relative min-w-0 flex-1">
+          <div className="pointer-events-none absolute inset-x-0 top-0 flex h-40 flex-col justify-between" aria-hidden>
+            <div className="border-t border-dashed border-line" />
+            <div className="border-t border-dashed border-line" />
+            <div className="border-t border-line" />
+          </div>
+          <div className="relative flex h-40 items-end" onMouseLeave={() => setHover(null)}>
+            {months.map((m, i) => (
+              <div
+                key={m.month}
+                className={`flex h-full flex-1 items-end justify-center gap-[2px] px-1 transition-opacity ${
+                  hover !== null && hover !== i ? 'opacity-45' : ''
+                }`}
+                onMouseEnter={() => setHover(i)}
+                onClick={() => setHover(i)}
+              >
+                <div className="w-full max-w-5 rounded-t-[4px] bg-income" style={{ height: m.income ? `max(3px, ${(m.income / max) * 100}%)` : 0 }} />
+                <div className="w-full max-w-5 rounded-t-[4px] bg-expense" style={{ height: m.expense ? `max(3px, ${(m.expense / max) * 100}%)` : 0 }} />
+              </div>
+            ))}
+            {h && hover !== null && (
+              <div
+                className="pointer-events-none absolute -top-2 z-10 -translate-x-1/2 -translate-y-full rounded-lg bg-ink px-2.5 py-1.5 text-xs whitespace-nowrap text-canvas shadow-lg"
+                style={{ left: `clamp(4.5rem, ${((hover + 0.5) / months.length) * 100}%, calc(100% - 4.5rem))` }}
+                role="status"
+              >
+                <div className="opacity-70">{monthLabel(h.month, true)}</div>
+                <div className="num">รับ {formatBaht(h.income)}</div>
+                <div className="num">จ่าย {formatBaht(h.expense)}</div>
+                <div className={`num font-semibold ${h.net < 0 ? 'text-expense' : ''}`}>สุทธิ {formatBaht(h.net, { sign: true })}</div>
+              </div>
+            )}
+          </div>
+          <div className="mt-1.5 flex text-[0.7rem] text-muted" aria-hidden>
+            {months.map((m) => (
+              <span key={m.month} className="flex-1 text-center">
+                {monthLabel(m.month)}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className="mt-2 flex gap-4 text-xs text-ink-2" aria-hidden>
+        <span className="flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-sm bg-income" /> รายรับ
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-sm bg-expense" /> รายจ่าย
+        </span>
+      </div>
+      <figcaption className="sr-only">
+        {months.map((m) => `${monthLabel(m.month, true)} รับ ${formatBaht(m.income)} จ่าย ${formatBaht(m.expense)}`).join(', ')}
       </figcaption>
     </figure>
   )
