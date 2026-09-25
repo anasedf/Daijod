@@ -1,0 +1,9 @@
+@import "tailwindcss";
+
+html {
+  font-family: system-ui, -apple-system, "Segoe UI", "Noto Sans Thai", "Sarabun", sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+body {
+  @apply bg-slate-100 text-slate-900;
+}
