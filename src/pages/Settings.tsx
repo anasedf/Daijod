@@ -10,6 +10,10 @@ import {
   HardDrive,
   Pencil,
   Plus,
+  Moon,
+  MonitorSmartphone,
+  Palette,
+  Sun,
   Tags,
   Trash2,
   TriangleAlert,
@@ -24,9 +28,10 @@ import { ImportRules } from '../components/ImportRules'
 import { ImportSheet } from '../components/ImportSheet'
 import { RecurringSection } from '../components/RecurringForm'
 import { CategoryIcon, errorMessage, FormError, PageHeader, Sheet, useConfirm, useToast } from '../components/ui'
-import type { Tab } from '../App'
 import type { AppData } from '../hooks/useData'
 import { formatBaht } from '../lib/money'
+import { THEME_LABEL, useTheme, type Theme } from '../lib/theme'
+import { WalletsPage } from './Wallets'
 import {
   addCategory,
   countCategoryUse,
@@ -296,20 +301,68 @@ function CategoryForm({
   )
 }
 
-type Section = 'categories' | 'recurring' | 'rules' | 'backup' | 'danger'
+type Section = 'wallets' | 'categories' | 'recurring' | 'import' | 'rules' | 'appearance' | 'backup' | 'danger'
 
-const SECTIONS: { id: Section | 'wallets' | 'import'; label: string; hint: (d: AppData) => string; Icon: LucideIcon; tone: string }[] = [
-  { id: 'wallets', label: 'กระเป๋า', hint: (d) => `${d.wallets.length} กระเป๋า · รวม ${formatBaht(d.total)}`, Icon: Wallet, tone: 'bg-accent-soft text-accent-strong' },
-  { id: 'categories', label: 'หมวดหมู่', hint: (d) => `${d.categories.length} หมวด · ไอคอน สี งบ ลำดับ`, Icon: Tags, tone: 'bg-sun-soft text-ink' },
-  { id: 'recurring', label: 'รายการประจำ', hint: (d) => (d.recurrings.length ? `${d.recurrings.length} รายการ` : 'ค่าห้อง ค่าเน็ต เงินเดือน'), Icon: CalendarClock, tone: 'bg-income-soft text-income' },
-  { id: 'import', label: 'นำเข้า statement', hint: () => 'กสิกรไทย, TrueMoney', Icon: FileUp, tone: 'bg-transfer-soft text-transfer' },
-  { id: 'rules', label: 'กฎจัดหมวด', hint: () => 'ใช้ตอนนำเข้า statement', Icon: Wand2, tone: 'bg-brand-soft text-ink' },
-  { id: 'backup', label: 'สำรองข้อมูล', hint: () => 'ดาวน์โหลด / นำเข้าไฟล์สำรอง', Icon: HardDrive, tone: 'bg-brand-soft text-ink' },
-  { id: 'danger', label: 'ลบข้อมูล', hint: () => 'ลบรายการ หรือเริ่มใหม่', Icon: TriangleAlert, tone: 'bg-expense-soft text-expense' },
+const SECTIONS: { id: Section; label: string; desc: string; hint: (d: AppData) => string; Icon: LucideIcon; tone: string }[] = [
+  { id: 'wallets', label: 'กระเป๋า', desc: 'ที่เก็บเงินแต่ละที่ เช่น เงินสด บัญชีธนาคาร e-Wallet', hint: (d) => `${d.wallets.length} กระเป๋า · รวม ${formatBaht(d.total)}`, Icon: Wallet, tone: 'bg-accent-soft text-accent-strong' },
+  { id: 'categories', label: 'หมวดหมู่', desc: 'ชื่อ ไอคอน สี งบต่อเดือน และลำดับของหมวด', hint: (d) => `${d.categories.length} หมวด`, Icon: Tags, tone: 'bg-sun-soft text-ink' },
+  { id: 'recurring', label: 'รายการประจำ', desc: 'ตั้งครั้งเดียว ถึงวันกำหนดหน้าภาพรวมจะถามให้บันทึก', hint: (d) => (d.recurrings.length ? `${d.recurrings.length} รายการ` : 'ค่าห้อง ค่าเน็ต เงินเดือน'), Icon: CalendarClock, tone: 'bg-income-soft text-income' },
+  { id: 'import', label: 'นำเข้า statement', desc: 'อ่านรายการจากไฟล์ statement ของธนาคาร แล้วตรวจก่อนบันทึก', hint: () => 'กสิกรไทย, TrueMoney', Icon: FileUp, tone: 'bg-transfer-soft text-transfer' },
+  { id: 'rules', label: 'กฎจัดหมวด', desc: 'กำหนดว่ารายการที่นำเข้าควรเข้าหมวดไหน', hint: () => 'ใช้ตอนนำเข้า statement', Icon: Wand2, tone: 'bg-brand-soft text-ink' },
+  { id: 'appearance', label: 'รูปลักษณ์', desc: 'ธีมสว่าง มืด หรือตามการตั้งค่าของเครื่อง', hint: () => 'ธีม', Icon: Palette, tone: 'bg-brand-soft text-ink' },
+  { id: 'backup', label: 'สำรองข้อมูล', desc: 'ข้อมูลอยู่ในเครื่องนี้เท่านั้น ควรดาวน์โหลดไฟล์สำรองเป็นระยะ', hint: () => 'ดาวน์โหลด / นำเข้าไฟล์สำรอง', Icon: HardDrive, tone: 'bg-brand-soft text-ink' },
+  { id: 'danger', label: 'ลบข้อมูล', desc: 'ลบรายการบางส่วน หรือล้างทั้งหมดเพื่อเริ่มใหม่', hint: () => 'ลบรายการ หรือเริ่มใหม่', Icon: TriangleAlert, tone: 'bg-expense-soft text-expense' },
 ]
 
-/** หน้าตั้งค่าแบบ iOS: มือถือเป็นรายการหัวข้อแตะเข้าไปทีละเรื่อง จอใหญ่เป็นสองคอลัมน์ */
-export function SettingsPage({ data, onNavigate }: { data: AppData; onNavigate?: (tab: Tab) => void }) {
+const THEMES: { id: Theme; Icon: LucideIcon; desc: string }[] = [
+  { id: 'light', Icon: Sun, desc: 'พื้นสว่างเสมอ' },
+  { id: 'dark', Icon: Moon, desc: 'พื้นมืดเสมอ' },
+  { id: 'system', Icon: MonitorSmartphone, desc: 'เปลี่ยนตามเครื่อง' },
+]
+
+/** ธีม: การ์ด 3 ใบ พร้อมภาพจำลองเล็ก ๆ */
+function AppearanceSection() {
+  const [theme, setTheme] = useTheme()
+  return (
+    <section className="card p-5">
+      <h2 className="card-title">ธีม</h2>
+      <p className="mt-1 text-sm text-muted">เลือกสไตล์ที่สบายตา</p>
+      <div role="radiogroup" aria-label="ธีม" className="mt-4 grid gap-3 sm:grid-cols-3">
+        {THEMES.map((t) => {
+          const on = theme === t.id
+          const dark = t.id === 'dark'
+          return (
+            <button
+              key={t.id}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              onClick={() => setTheme(t.id)}
+              className={`rounded-2xl border-2 p-2 text-left transition-colors ${on ? 'border-accent bg-accent-soft/50' : 'border-line hover:bg-sunken'}`}
+            >
+              {/* ภาพจำลองหน้าจอ */}
+              <div className={`h-20 overflow-hidden rounded-xl p-2 ${dark ? 'bg-[#141416]' : t.id === 'system' ? 'bg-gradient-to-r from-[#f3f2f7] to-[#141416]' : 'bg-[#f3f2f7]'}`} aria-hidden>
+                <div className="flex gap-1.5">
+                  <div className={`h-6 w-1/3 rounded-md ${dark ? 'bg-[#26262b]' : 'bg-white'}`} />
+                  <div className="h-6 flex-1 rounded-md bg-accent" />
+                </div>
+                <div className={`mt-1.5 h-7 rounded-md ${dark ? 'bg-[#26262b]' : 'bg-white'}`} />
+              </div>
+              <div className="mt-2 flex items-center gap-2 px-1 pb-1">
+                <t.Icon size={16} className={on ? 'text-accent-strong' : 'text-muted'} aria-hidden />
+                <span className="text-sm font-medium">{THEME_LABEL[t.id]}</span>
+                <span className="ml-auto text-xs text-muted">{t.desc}</span>
+              </div>
+            </button>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
+/** หน้าตั้งค่าแบบ iOS: ทุกหัวข้อเปิดรายละเอียดแบบเดียวกัน (มือถือ = หน้าย่อย, จอใหญ่ = แผงขวา) */
+export function SettingsPage({ data }: { data: AppData }) {
   const toast = useToast()
   const confirm = useConfirm()
   const fileInput = useRef<HTMLInputElement>(null)
@@ -376,14 +429,8 @@ export function SettingsPage({ data, onNavigate }: { data: AppData; onNavigate?:
     }
   }
 
-  function open(id: (typeof SECTIONS)[number]['id']) {
-    if (id === 'wallets') return onNavigate?.('wallets')
-    if (id === 'import') return setImporting(true)
-    setSection(id)
-  }
-
-  const active: Section = section ?? 'categories'
-  const activeMeta = SECTIONS.find((s) => s.id === active)!
+  const active: Section = section ?? 'wallets'
+  const meta = SECTIONS.find((s) => s.id === active)!
 
   const menu = (
     <ul className="card divide-y divide-line/70 overflow-hidden">
@@ -391,11 +438,9 @@ export function SettingsPage({ data, onNavigate }: { data: AppData; onNavigate?:
         <li key={s.id}>
           <button
             type="button"
-            onClick={() => open(s.id)}
-            aria-current={s.id === active && (section !== null || true) ? 'true' : undefined}
-            className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-sunken ${
-              s.id === active ? 'lg:bg-sunken' : ''
-            }`}
+            onClick={() => setSection(s.id)}
+            aria-current={s.id === active ? 'true' : undefined}
+            className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-sunken ${s.id === active ? 'lg:bg-sunken' : ''}`}
           >
             <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${s.tone}`} aria-hidden>
               <s.Icon size={18} />
@@ -412,7 +457,9 @@ export function SettingsPage({ data, onNavigate }: { data: AppData; onNavigate?:
   )
 
   const content =
-    active === 'categories' ? (
+    active === 'wallets' ? (
+      <WalletsPage data={data} embedded />
+    ) : active === 'categories' ? (
       <div className="space-y-4">
         {(['expense', 'income'] as CategoryType[]).map((type) => {
           const cats = data.categories.filter((c) => c.type === type)
@@ -482,14 +529,33 @@ export function SettingsPage({ data, onNavigate }: { data: AppData; onNavigate?:
       </div>
     ) : active === 'recurring' ? (
       <RecurringSection data={data} />
+    ) : active === 'import' ? (
+      <section className="card p-5">
+        <h2 className="card-title">นำเข้าจาก statement</h2>
+        <p className="mt-1 text-sm text-ink-2">
+          รองรับไฟล์ PDF ของ <b className="text-ink">กสิกรไทย (K PLUS)</b> และ <b className="text-ink">TrueMoney Wallet</b> ไฟล์ถูกอ่านในเครื่องนี้เท่านั้น
+          แอปจะเดาหมวดให้ กันรายการซ้ำ และจับคู่การโอนระหว่างกระเป๋าของคุณเอง ตรวจทุกอย่างได้ก่อนบันทึก
+        </p>
+        <ol className="mt-4 space-y-2 text-sm text-ink-2">
+          <li className="flex gap-2"><span className="num font-semibold text-ink">1.</span> ขอไฟล์ statement จากแอปธนาคาร (ถ้าติดรหัสผ่านใส่ในแอปได้)</li>
+          <li className="flex gap-2"><span className="num font-semibold text-ink">2.</span> เลือกกระเป๋าที่เป็นบัญชีนั้น แล้วเลือกไฟล์</li>
+          <li className="flex gap-2"><span className="num font-semibold text-ink">3.</span> ตรวจหมวดที่เดาให้ แล้วกดนำเข้า</li>
+        </ol>
+        <button className="btn-primary mt-5" onClick={() => setImporting(true)} disabled={data.wallets.length === 0}>
+          <FileUp size={18} aria-hidden /> เลือกไฟล์ statement
+        </button>
+        {data.wallets.length === 0 && <p className="mt-2 text-xs text-muted">ต้องมีกระเป๋าอย่างน้อย 1 ใบก่อน</p>}
+      </section>
     ) : active === 'rules' ? (
       <ImportRules data={data} />
+    ) : active === 'appearance' ? (
+      <AppearanceSection />
     ) : active === 'danger' ? (
       <DangerZone data={data} />
     ) : (
       <section className="card p-5">
         <h2 className="card-title">สำรองข้อมูล</h2>
-        <p className="mt-2 text-sm text-ink-2">
+        <p className="mt-1 text-sm text-ink-2">
           ข้อมูลทั้งหมดเก็บอยู่ในเบราว์เซอร์ของเครื่องนี้เท่านั้น ถ้าล้างข้อมูลเบราว์เซอร์หรือเปลี่ยนเครื่อง ข้อมูลจะหาย
           ควรสำรองเก็บไว้เป็นระยะ (เช่น อัปโหลดขึ้น Google Drive)
         </p>
@@ -529,9 +595,16 @@ export function SettingsPage({ data, onNavigate }: { data: AppData; onNavigate?:
       </section>
     )
 
+  const detailHeader = (
+    <div className="mb-4">
+      <h2 className="text-xl font-semibold tracking-tight">{meta.label}</h2>
+      <p className="mt-0.5 text-sm text-muted">{meta.desc}</p>
+    </div>
+  )
+
   return (
     <>
-      {/* มือถือ: หน้ารายการหัวข้อ หรือหน้าย่อยพร้อมปุ่มย้อนกลับ */}
+      {/* มือถือ: รายการหัวข้อ → หน้าย่อยพร้อมปุ่มย้อนกลับ */}
       <div className="lg:hidden">
         {section === null ? (
           <>
@@ -540,21 +613,24 @@ export function SettingsPage({ data, onNavigate }: { data: AppData; onNavigate?:
           </>
         ) : (
           <>
-            <button type="button" className="btn-ghost -ml-3 mb-2 min-h-9 px-3 text-sm" onClick={() => setSection(null)}>
+            <button type="button" className="btn-ghost -ml-3 mb-3 min-h-9 px-3 text-sm" onClick={() => setSection(null)}>
               <ArrowLeft size={16} aria-hidden /> ตั้งค่า
             </button>
-            <PageHeader title={activeMeta.label} />
+            {detailHeader}
             {content}
           </>
         )}
       </div>
 
-      {/* จอใหญ่: สองคอลัมน์ */}
+      {/* จอใหญ่: เมนูซ้าย รายละเอียดขวา */}
       <div className="hidden lg:block">
         <PageHeader title="ตั้งค่า" />
-        <div className="grid grid-cols-[17rem_minmax(0,1fr)] items-start gap-5">
+        <div className="grid grid-cols-[17rem_minmax(0,1fr)] items-start gap-6">
           <div className="sticky top-8">{menu}</div>
-          {content}
+          <div>
+            {detailHeader}
+            {content}
+          </div>
         </div>
       </div>
 

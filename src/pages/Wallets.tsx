@@ -10,7 +10,8 @@ import { effectOn } from '../lib/ledger'
 import { formatBaht } from '../lib/money'
 import type { Wallet } from '../lib/types'
 
-export function WalletsPage({ data }: { data: AppData }) {
+/** embedded = ใช้ในหน้าตั้งค่า (ไม่มีหัวหน้าใหญ่ มีปุ่มเพิ่มในแถบหัวการ์ดแทน) */
+export function WalletsPage({ data, embedded = false }: { data: AppData; embedded?: boolean }) {
   const [editing, setEditing] = useState<Wallet | 'new' | null>(null)
   const confirm = useConfirm()
   const toast = useToast()
@@ -63,24 +64,43 @@ export function WalletsPage({ data }: { data: AppData }) {
 
   return (
     <>
-      <PageHeader
-        title="กระเป๋า"
-        subtitle={
-          data.wallets.length ? (
-            <>
-              ยอดรวม <span className="num font-semibold text-ink">{formatBaht(data.total)}</span> จาก {data.wallets.length}{' '}
-              กระเป๋า
-            </>
-          ) : undefined
-        }
-        actions={
-          data.wallets.length > 0 && (
-            <button className="btn-primary hidden sm:inline-flex" onClick={() => setEditing('new')}>
-              <Plus size={18} aria-hidden /> เพิ่มกระเป๋า
+      {embedded ? (
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <p className="text-sm text-ink-2">
+            {data.wallets.length ? (
+              <>
+                ยอดรวม <span className="num font-semibold text-ink">{formatBaht(data.total)}</span> จาก {data.wallets.length} กระเป๋า
+              </>
+            ) : (
+              'ยังไม่มีกระเป๋า'
+            )}
+          </p>
+          {data.wallets.length > 0 && (
+            <button className="btn-primary min-h-9 px-3 text-sm" onClick={() => setEditing('new')}>
+              <Plus size={16} aria-hidden /> เพิ่มกระเป๋า
             </button>
-          )
-        }
-      />
+          )}
+        </div>
+      ) : (
+        <PageHeader
+          title="กระเป๋า"
+          subtitle={
+            data.wallets.length ? (
+              <>
+                ยอดรวม <span className="num font-semibold text-ink">{formatBaht(data.total)}</span> จาก {data.wallets.length}{' '}
+                กระเป๋า
+              </>
+            ) : undefined
+          }
+          actions={
+            data.wallets.length > 0 && (
+              <button className="btn-primary hidden sm:inline-flex" onClick={() => setEditing('new')}>
+                <Plus size={18} aria-hidden /> เพิ่มกระเป๋า
+              </button>
+            )
+          }
+        />
+      )}
 
       {data.wallets.length === 0 ? (
         <div className="card mx-auto max-w-lg">

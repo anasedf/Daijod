@@ -4,8 +4,8 @@ import { TransactionForm } from './components/TransactionForm'
 import { UIProvider } from './components/ui'
 import { WalletForm } from './components/WalletForm'
 import { useData } from './hooks/useData'
-import { getPref, setPref } from './lib/prefs'
 import { formatBaht } from './lib/money'
+import { THEME_LABEL, useTheme, type Theme } from './lib/theme'
 import type { Transaction } from './lib/types'
 import { DashboardPage } from './pages/Dashboard'
 import { HistoryPage } from './pages/History'
@@ -14,7 +14,6 @@ import { StatsPage } from './pages/Stats'
 import { WalletsPage } from './pages/Wallets'
 
 export type Tab = 'home' | 'history' | 'stats' | 'wallets' | 'settings'
-type Theme = 'system' | 'light' | 'dark'
 
 const TABS: { id: Tab; label: string; Icon: LucideIcon }[] = [
   { id: 'home', label: 'ภาพรวม', Icon: House },
@@ -41,31 +40,16 @@ function Logo() {
 
 function Shell() {
   const data = useData()
-  // ธีม: ตามเครื่อง (ค่าเริ่มต้น) / สว่าง / มืด กดปุ่มวนไปเรื่อย ๆ
-  const [theme, setTheme] = useState<Theme>(() => {
-    const t = getPref('theme')
-    return t === 'light' || t === 'dark' ? t : 'system'
-  })
-  useEffect(() => {
-    const mq = window.matchMedia('(prefers-color-scheme: dark)')
-    const apply = () => {
-      document.documentElement.dataset.theme = theme === 'system' ? (mq.matches ? 'dark' : 'light') : theme
-    }
-    apply()
-    setPref('theme', theme)
-    mq.addEventListener('change', apply)
-    return () => mq.removeEventListener('change', apply)
-  }, [theme])
+  const [theme, setTheme] = useTheme()
   const nextTheme: Record<Theme, Theme> = { system: 'light', light: 'dark', dark: 'system' }
-  const themeLabel: Record<Theme, string> = { system: 'ธีมตามเครื่อง', light: 'ธีมสว่าง', dark: 'ธีมมืด' }
   const ThemeIcon = theme === 'light' ? Sun : theme === 'dark' ? Moon : MonitorSmartphone
   const themeToggle = (
     <button
       type="button"
       className="icon-btn bg-surface lg:bg-transparent"
       onClick={() => setTheme(nextTheme[theme])}
-      aria-label={`${themeLabel[theme]} (กดเพื่อเปลี่ยน)`}
-      title={themeLabel[theme]}
+      aria-label={`ธีม${THEME_LABEL[theme]} (กดเพื่อเปลี่ยน)`}
+      title={`ธีม${THEME_LABEL[theme]}`}
     >
       <ThemeIcon size={19} />
     </button>
@@ -173,7 +157,7 @@ function Shell() {
         ) : tab === 'wallets' ? (
           <WalletsPage data={data} />
         ) : (
-          <SettingsPage data={data} onNavigate={setTab} />
+          <SettingsPage data={data} />
         )}
       </main>
 
