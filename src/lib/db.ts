@@ -181,11 +181,33 @@ export async function updateCategory(
   await d.categories.update(id, { name: input.name.trim(), icon: input.icon, iconName: input.iconName, color: input.color })
 }
 
-/** ลบหมวดได้เฉพาะเมื่อไม่มีรายการใช้อยู่ เพื่อไม่ให้รายการเสียข้อมูลเงียบ ๆ */
-export async function deleteCategory(id: string, d: DaijodDB = db) {
+/** จำนวนรายการที่ใช้หมวดนี้ */
+export function countCategoryUse(id: string, d: DaijodDB = db) {
+  return d.transactions.where('categoryId').equals(id).count()
+}
+
+/**
+ * ลบหมวด ถ้ามีรายการใช้อยู่ต้องบอกว่าจะย้ายไปหมวดไหน (moveTo = null คือ "ไม่ระบุหมวด")
+ * ไม่ส่ง moveTo มา = ลบได้เฉพาะหมวดที่ไม่มีใครใช้ เพื่อไม่ให้รายการเสียข้อมูลเงียบ ๆ
+ */
+export async function deleteCategory(id: string, moveTo?: string | null, d: DaijodDB = db) {
   await d.transaction('rw', d.categories, d.transactions, async () => {
-    const used = await d.transactions.where('categoryId').equals(id).count()
-    if (used > 0) throw new UserError(`หมวดนี้ถูกใช้อยู่ใน ${used} รายการ ลบไม่ได้ (แก้ชื่อแทนได้)`)
+    const used = await countCategoryUse(id, d)
+    if (used > 0) {
+      if (moveTo === undefined) throw new UserError(`หมวดนี้ถูกใช้อยู่ใน ${used} รายการ ต้องเลือกว่าจะย้ายไปหมวดไหนก่อน`)
+      if (moveTo) {
+        const from = await d.categories.get(id)
+        const to = await d.categories.get(moveTo)
+        if (!to || !from || to.type !== from.type) throw new UserError('หมวดปลายทางไม่ถูกต้อง')
+      }
+      await d.transactions
+        .where('categoryId')
+        .equals(id)
+        .modify((t) => {
+          if (moveTo) t.categoryId = moveTo
+          else delete t.categoryId
+        })
+    }
     await d.categories.delete(id)
   })
 }

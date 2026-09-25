@@ -88,11 +88,24 @@ describe('ฐานข้อมูล', () => {
     expect(bal.get(c)).toBe(107_00)
   })
 
-  it('ลบหมวดที่มีรายการใช้อยู่ไม่ได้', async () => {
+  it('ลบหมวดที่มีรายการใช้อยู่ต้องบอกว่าจะย้ายไปไหน', async () => {
     const w = await addWallet({ name: 'A', type: 'cash', openingBalance: 0, color: '#000' }, d)
     const cat = await addCategory({ name: 'กาแฟ', type: 'expense', icon: '☕' }, d)
-    await addTransaction({ ...base, type: 'expense', amount: 60_00, sourceWalletId: w, categoryId: cat }, d)
-    await expect(deleteCategory(cat, d)).rejects.toThrow('ลบไม่ได้')
+    const other = await addCategory({ name: 'เครื่องดื่ม', type: 'expense', icon: '🥤' }, d)
+    const income = await addCategory({ name: 'โบนัส', type: 'income', icon: '💰' }, d)
+    const id = await addTransaction({ ...base, type: 'expense', amount: 60_00, sourceWalletId: w, categoryId: cat }, d)
+
+    await expect(deleteCategory(cat, undefined, d)).rejects.toThrow('ต้องเลือก')
+    await expect(deleteCategory(cat, income, d)).rejects.toThrow('ไม่ถูกต้อง')
+    expect(await d.categories.get(cat)).toBeDefined()
+
+    await deleteCategory(cat, other, d)
+    expect(await d.categories.get(cat)).toBeUndefined()
+    expect((await d.transactions.get(id))?.categoryId).toBe(other)
+
+    // ย้ายเป็น "ไม่ระบุหมวด"
+    await deleteCategory(other, null, d)
+    expect((await d.transactions.get(id))?.categoryId).toBeUndefined()
   })
 
   it('สำรองแล้วนำเข้าได้ข้อมูลเดิม', async () => {

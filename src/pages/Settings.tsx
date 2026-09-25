@@ -1,10 +1,11 @@
-import { Download, FileUp, HardDrive, Plus, TriangleAlert, Upload } from 'lucide-react'
-import { useRef, useState, type FormEvent } from 'react'
+import { Download, FileUp, HardDrive, Pencil, Plus, Trash2, TriangleAlert, Upload } from 'lucide-react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { ImportSheet } from '../components/ImportSheet'
 import { CategoryIcon, errorMessage, FormError, PageHeader, Sheet, useConfirm, useToast } from '../components/ui'
 import type { AppData } from '../hooks/useData'
 import {
   addCategory,
+  countCategoryUse,
   deleteCategory,
   exportBackup,
   importBackup,
@@ -15,17 +16,95 @@ import { todayISO } from '../lib/dates'
 import { CATEGORY_COLORS, ICON_GROUPS } from '../lib/icons'
 import type { Category, CategoryType } from '../lib/types'
 
+/** ยืนยันลบหมวด ถ้ามีรายการใช้อยู่ให้เลือกว่าจะย้ายไปหมวดไหน */
+function DeleteCategorySheet({
+  category,
+  categories,
+  onClose,
+  onDeleted,
+}: {
+  category: Category
+  categories: Category[]
+  onClose: () => void
+  onDeleted: () => void
+}) {
+  const toast = useToast()
+  const [used, setUsed] = useState<number | null>(null)
+  const [moveTo, setMoveTo] = useState('')
+  const [busy, setBusy] = useState(false)
+  const targets = categories.filter((c) => c.type === category.type && c.id !== category.id)
+
+  useEffect(() => {
+    countCategoryUse(category.id).then(setUsed)
+  }, [category.id])
+
+  async function run() {
+    setBusy(true)
+    try {
+      await deleteCategory(category.id, used ? moveTo || null : undefined)
+      toast(used ? `ลบหมวดแล้ว ย้าย ${used} รายการเรียบร้อย` : 'ลบหมวดแล้ว')
+      onDeleted()
+    } catch (e) {
+      toast(errorMessage(e), 'error')
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Sheet
+      title={`ลบหมวด “${category.name}”?`}
+      onClose={onClose}
+      footer={
+        <div className="flex gap-3">
+          <button type="button" className="btn-secondary flex-1" onClick={onClose}>
+            ยกเลิก
+          </button>
+          <button type="button" className="btn-danger flex-1" onClick={run} disabled={busy || used === null}>
+            {busy ? 'กำลังลบ…' : used ? 'ย้ายรายการและลบหมวด' : 'ลบหมวด'}
+          </button>
+        </div>
+      }
+    >
+      {used === null ? (
+        <p className="text-muted">กำลังตรวจสอบ…</p>
+      ) : used === 0 ? (
+        <p className="text-ink-2">หมวดนี้ยังไม่มีรายการใช้อยู่ ลบได้เลย</p>
+      ) : (
+        <div className="space-y-4">
+          <p className="text-ink-2">
+            มี <b className="text-ink">{used} รายการ</b> ใช้หมวดนี้อยู่ เลือกว่าจะย้ายรายการเหล่านั้นไปหมวดไหน
+          </p>
+          <div>
+            <label className="label" htmlFor="c-move">
+              ย้ายไปหมวด
+            </label>
+            <select id="c-move" className="field" value={moveTo} onChange={(e) => setMoveTo(e.target.value)}>
+              <option value="">ไม่ระบุหมวด</option>
+              {targets.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
+    </Sheet>
+  )
+}
+
 function CategoryForm({
   category,
   type,
   onClose,
+  onDelete,
 }: {
   category?: Category
   type: CategoryType
   onClose: () => void
+  onDelete?: () => void
 }) {
   const toast = useToast()
-  const confirm = useConfirm()
   const [name, setName] = useState(category?.name ?? '')
   const [iconName, setIconName] = useState(category?.iconName ?? (category ? '' : type === 'income' ? 'Coins' : 'Package'))
   const [emoji, setEmoji] = useState(category?.iconName ? '' : category?.icon ?? '')
@@ -50,23 +129,6 @@ function CategoryForm({
     }
   }
 
-  async function remove() {
-    if (!category) return
-    const ok = await confirm({
-      title: `ลบหมวด “${category.name}”?`,
-      message: <p>ลบได้เฉพาะหมวดที่ยังไม่มีรายการใช้อยู่</p>,
-      confirmLabel: 'ลบหมวด',
-      danger: true,
-    })
-    if (!ok) return
-    try {
-      await deleteCategory(category.id)
-      toast('ลบหมวดแล้ว')
-      onClose()
-    } catch (e) {
-      toast(errorMessage(e), 'error')
-    }
-  }
 
   return (
     <Sheet
@@ -75,9 +137,9 @@ function CategoryForm({
       size="lg"
       footer={
         <div className="flex gap-3">
-          {category && (
-            <button type="button" className="btn-secondary text-expense" onClick={remove}>
-              ลบ
+          {category && onDelete && (
+            <button type="button" className="btn-secondary text-expense" onClick={onDelete}>
+              <Trash2 size={18} aria-hidden /> ลบ
             </button>
           )}
           <button type="submit" form="category-form" className="btn-primary flex-1" disabled={saving}>
@@ -185,6 +247,7 @@ export function SettingsPage({ data }: { data: AppData }) {
   const confirm = useConfirm()
   const fileInput = useRef<HTMLInputElement>(null)
   const [editing, setEditing] = useState<{ type: CategoryType; category?: Category } | null>(null)
+  const [deleting, setDeleting] = useState<Category | null>(null)
   const [importing, setImporting] = useState(false)
 
   async function exportFile() {
@@ -268,7 +331,7 @@ export function SettingsPage({ data }: { data: AppData }) {
                 <div className="mb-4 flex items-center justify-between">
                   <div>
                     <h2 className="card-title">หมวด{type === 'income' ? 'รายรับ' : 'รายจ่าย'}</h2>
-                    <p className="text-xs text-muted">{cats.length} หมวด · แตะเพื่อแก้ไขชื่อ ไอคอน หรือสี</p>
+                    <p className="text-xs text-muted">{cats.length} หมวด</p>
                   </div>
                   <button className="btn-ghost -mr-2 min-h-9 px-3 text-sm text-brand" onClick={() => setEditing({ type })}>
                     <Plus size={16} aria-hidden /> เพิ่มหมวด
@@ -276,15 +339,35 @@ export function SettingsPage({ data }: { data: AppData }) {
                 </div>
                 <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
                   {cats.map((c) => (
-                    <li key={c.id}>
+                    <li
+                      key={c.id}
+                      className="group relative flex items-center gap-0.5 rounded-xl border border-line pr-1 pl-2.5 transition-colors hover:border-brand/40"
+                    >
                       <button
-                        className="flex w-full items-center gap-2.5 rounded-xl border border-line px-2.5 py-2 text-left text-sm transition-colors hover:border-brand/40 hover:bg-sunken"
+                        className="flex min-w-0 flex-1 items-center gap-2.5 py-2 text-left text-sm"
                         onClick={() => setEditing({ type, category: c })}
                         aria-label={`แก้ไขหมวด ${c.name}`}
                       >
                         <CategoryIcon category={c} size="sm" />
                         <span className="truncate">{c.name}</span>
                       </button>
+                      {/* มือถือ: ปุ่มอยู่ท้ายชิปเสมอ / จอใหญ่: ลอยทับด้านขวาเฉพาะตอนชี้ ไม่กินที่ชื่อ */}
+                      <div className="flex items-center gap-0.5 lg:absolute lg:inset-y-0.5 lg:right-1 lg:rounded-lg lg:bg-surface lg:pl-1 lg:opacity-0 lg:group-focus-within:opacity-100 lg:group-hover:opacity-100">
+                        <button
+                          className="icon-btn h-8 w-8"
+                          onClick={() => setEditing({ type, category: c })}
+                          aria-label={`แก้ไข ${c.name}`}
+                        >
+                          <Pencil size={15} />
+                        </button>
+                        <button
+                          className="icon-btn h-8 w-8 hover:text-expense"
+                          onClick={() => setDeleting(c)}
+                          aria-label={`ลบ ${c.name}`}
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
                     </li>
                   ))}
                 </ul>
@@ -368,7 +451,25 @@ export function SettingsPage({ data }: { data: AppData }) {
         </div>
       </div>
 
-      {editing && <CategoryForm type={editing.type} category={editing.category} onClose={() => setEditing(null)} />}
+      {editing && (
+        <CategoryForm
+          type={editing.type}
+          category={editing.category}
+          onClose={() => setEditing(null)}
+          onDelete={editing.category ? () => setDeleting(editing.category!) : undefined}
+        />
+      )}
+      {deleting && (
+        <DeleteCategorySheet
+          category={deleting}
+          categories={data.categories}
+          onClose={() => setDeleting(null)}
+          onDeleted={() => {
+            setDeleting(null)
+            setEditing(null)
+          }}
+        />
+      )}
       {importing && <ImportSheet data={data} onClose={() => setImporting(false)} />}
     </>
   )
