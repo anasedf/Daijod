@@ -6,15 +6,88 @@ import { defaultRange, RangePicker, rangeLabel, resolveRange } from '../componen
 import { TransactionList } from '../components/TransactionList'
 import { CategoryIcon, EmptyState, errorMessage, PageHeader, useToast, WalletIcon } from '../components/ui'
 import type { AppData } from '../hooks/useData'
-import { formatDateLong, todayISO, toISODate, type DateRange } from '../lib/dates'
+import { formatDateLong, formatDateShort, todayISO, toISODate, type DateRange } from '../lib/dates'
 import { backupReminder, downloadBackup, snoozeBackupReminder } from '../lib/backup'
 import { budgetSummary } from '../lib/budget'
-import { addTransaction, db } from '../lib/db'
+import { addTransaction, db, postRecurring, skipRecurring } from '../lib/db'
+import { TX_META } from '../lib/labels'
+import { dueRecurrings } from '../lib/recurring'
 import { expenseByCategory, filterTransactions, sortNewestFirst, summarize } from '../lib/ledger'
 import { formatBaht } from '../lib/money'
 import { suggestQuickAdds, type QuickAdd } from '../lib/quick'
 import { compareMonths, monthLabel, monthlyTotals } from '../lib/trend'
-import type { Transaction } from '../lib/types'
+import type { Recurring, Transaction } from '../lib/types'
+
+/** รายการประจำที่ถึงกำหนดแล้วในเดือนนี้: บันทึกหรือข้าม */
+function DueRecurrings({ data, onOpen }: { data: AppData; onOpen: (t: Transaction) => void }) {
+  const toast = useToast()
+  const [busy, setBusy] = useState<string | null>(null)
+  const due = useMemo(() => dueRecurrings(data.recurrings, todayISO()), [data.recurrings])
+  if (due.length === 0) return null
+
+  async function post(rec: Recurring, date: string) {
+    setBusy(rec.id)
+    try {
+      const id = await postRecurring(rec, date)
+      toast(`บันทึก ${rec.name} ${formatBaht(rec.amount)} แล้ว`, 'success', {
+        label: 'แก้ไข',
+        onClick: async () => {
+          const t = await db.transactions.get(id)
+          if (t) onOpen(t)
+        },
+      })
+    } catch (e) {
+      toast(errorMessage(e), 'error')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function skip(rec: Recurring, date: string) {
+    setBusy(rec.id)
+    try {
+      await skipRecurring(rec.id, date.slice(0, 7))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  return (
+    <section className="card lg:col-span-12" aria-label="รายการประจำถึงกำหนด">
+      <CardHeader title="รายการประจำถึงกำหนด" subtitle={`${due.length} รายการรอบันทึก`} />
+      <ul className="divide-y divide-line/70 border-t border-line/70">
+        {due.map(({ rec, date }) => {
+          const meta = TX_META[rec.type]
+          const cat = rec.categoryId ? data.categoryMap.get(rec.categoryId) : undefined
+          const wallet = data.walletMap.get(rec.type === 'income' ? rec.destinationWalletId! : rec.sourceWalletId!)
+          return (
+            <li key={rec.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-5 py-3">
+              <CategoryIcon category={cat} size="md" fallback={<meta.Icon size={18} className={meta.text} />} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-medium">{rec.name}</span>
+                <span className="block text-xs text-muted">
+                  ครบกำหนด {formatDateShort(date)} · {wallet?.name}
+                </span>
+              </span>
+              <span className={`num font-semibold ${rec.type === 'transfer' ? 'text-ink-2' : meta.text}`}>
+                {meta.sign}
+                {formatBaht(rec.amount)}
+              </span>
+              <span className="flex gap-2">
+                <button className="btn-ghost min-h-9 px-3 text-sm" disabled={busy !== null} onClick={() => skip(rec, date)}>
+                  ข้ามเดือนนี้
+                </button>
+                <button className="btn-primary min-h-9 px-3 text-sm" disabled={busy !== null} onClick={() => post(rec, date)}>
+                  บันทึก
+                </button>
+              </span>
+            </li>
+          )
+        })}
+      </ul>
+    </section>
+  )
+}
 
 /** 6 เดือนย้อนหลัง + เดือนนี้เทียบเดือนก่อน */
 function TrendCard({ data }: { data: AppData }) {
@@ -372,6 +445,7 @@ export function DashboardPage({
 
       <div className="grid gap-4 lg:grid-cols-12 lg:gap-5">
         <BackupBanner data={data} />
+        <DueRecurrings data={data} onOpen={onOpen} />
         <QuickAdds data={data} onOpen={onOpen} />
 
         {/* ยอดรวม + กระเป๋า */}

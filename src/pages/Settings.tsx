@@ -2,6 +2,7 @@ import { Download, FileUp, HardDrive, Pencil, Plus, Trash2, TriangleAlert, Uploa
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { ImportRules } from '../components/ImportRules'
 import { ImportSheet } from '../components/ImportSheet'
+import { RecurringSection } from '../components/RecurringForm'
 import { CategoryIcon, errorMessage, FormError, PageHeader, Sheet, useConfirm, useToast } from '../components/ui'
 import type { AppData } from '../hooks/useData'
 import {
@@ -402,6 +403,8 @@ export function SettingsPage({ data }: { data: AppData }) {
               </section>
             )
           })}
+
+          <RecurringSection data={data} />
 
           <ImportRules data={data} />
 

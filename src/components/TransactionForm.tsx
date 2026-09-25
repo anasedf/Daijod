@@ -9,7 +9,7 @@ import { getPref, setPref } from '../lib/prefs'
 import type { Transaction, TransactionType, Wallet } from '../lib/types'
 import { CategoryIcon, errorMessage, FormError, Sheet, useConfirm, useToast, WalletIcon } from './ui'
 
-function WalletPicker({
+export function WalletPicker({
   label,
   wallets,
   balances,

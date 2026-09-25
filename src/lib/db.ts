@@ -1,12 +1,13 @@
 import Dexie, { type EntityTable } from 'dexie'
 import { newId } from './id'
 import { normalizeTransaction, validateTransaction } from './ledger'
-import type { Category, Transaction, TransactionInput, Wallet, WalletInput } from './types'
+import type { Category, Recurring, RecurringInput, Transaction, TransactionInput, Wallet, WalletInput } from './types'
 
 export class DaijodDB extends Dexie {
   wallets!: EntityTable<Wallet, 'id'>
   transactions!: EntityTable<Transaction, 'id'>
   categories!: EntityTable<Category, 'id'>
+  recurring!: EntityTable<Recurring, 'id'>
 
   constructor(name = 'daijod') {
     super(name)
@@ -28,6 +29,8 @@ export class DaijodDB extends Dexie {
           }
         }),
       )
+    // v3: รายการประจำ
+    this.version(3).stores({ ...stores, recurring: 'id, active' })
     this.on('populate', (tx) => {
       tx.table('categories').bulkAdd(DEFAULT_CATEGORIES)
     })
@@ -134,8 +137,8 @@ export async function deleteTransactions(ids: string[], d: DaijodDB = db) {
 
 /** ลบทุกอย่างแล้วกลับไปเป็นแอปเปล่า ๆ (เหลือหมวดเริ่มต้น) UI ต้องยืนยันกับผู้ใช้ก่อน */
 export async function resetAllData(d: DaijodDB = db) {
-  await d.transaction('rw', d.wallets, d.transactions, d.categories, async () => {
-    await Promise.all([d.wallets.clear(), d.transactions.clear(), d.categories.clear()])
+  await d.transaction('rw', d.wallets, d.transactions, d.categories, d.recurring, async () => {
+    await Promise.all([d.wallets.clear(), d.transactions.clear(), d.categories.clear(), d.recurring.clear()])
     await d.categories.bulkAdd(DEFAULT_CATEGORIES)
   })
 }
@@ -161,6 +164,74 @@ export async function importTransactions(inputs: TransactionInput[], d: DaijodDB
     )
   })
   return cleans.length
+}
+
+// ---------- รายการประจำ ----------
+
+function checkRecurring(input: RecurringInput, walletIds: Set<string>) {
+  if (!input.name.trim()) throw new UserError('กรุณาตั้งชื่อรายการประจำ')
+  if (!Number.isInteger(input.day) || input.day < 1 || input.day > 31) throw new UserError('วันที่ต้องอยู่ระหว่าง 1–31')
+  const errors = validateTransaction({ ...input, date: '2000-01-01' }, walletIds)
+  if (errors.length) throw new UserError(errors.join('\n'))
+}
+
+function cleanRecurring(input: RecurringInput): RecurringInput {
+  const t = normalizeTransaction({ ...input, date: '2000-01-01' })
+  return {
+    name: input.name.trim(),
+    type: t.type,
+    amount: t.amount,
+    day: input.day,
+    note: t.note,
+    categoryId: t.categoryId,
+    sourceWalletId: t.sourceWalletId,
+    destinationWalletId: t.destinationWalletId,
+    active: input.active,
+  }
+}
+
+export async function addRecurring(input: RecurringInput, d: DaijodDB = db): Promise<string> {
+  const ids = new Set((await d.wallets.toCollection().primaryKeys()) as string[])
+  checkRecurring(input, ids)
+  const now = Date.now()
+  const id = newId()
+  await d.recurring.add({ ...cleanRecurring(input), id, createdAt: now, updatedAt: now })
+  return id
+}
+
+export async function updateRecurring(id: string, input: RecurringInput, d: DaijodDB = db) {
+  const ids = new Set((await d.wallets.toCollection().primaryKeys()) as string[])
+  checkRecurring(input, ids)
+  const old = await d.recurring.get(id)
+  if (!old) throw new UserError('ไม่พบรายการประจำนี้แล้ว')
+  await d.recurring.put({ ...cleanRecurring(input), id, lastMonth: old.lastMonth, createdAt: old.createdAt, updatedAt: Date.now() })
+}
+
+export async function deleteRecurring(id: string, d: DaijodDB = db) {
+  await d.recurring.delete(id)
+}
+
+/** บันทึกรายการประจำเป็นรายการจริงของวันที่กำหนด แล้วจำว่าเดือนนี้ทำแล้ว */
+export async function postRecurring(rec: Recurring, date: string, d: DaijodDB = db): Promise<string> {
+  const id = await addTransaction(
+    {
+      type: rec.type,
+      amount: rec.amount,
+      date,
+      note: rec.note || rec.name,
+      categoryId: rec.categoryId,
+      sourceWalletId: rec.sourceWalletId,
+      destinationWalletId: rec.destinationWalletId,
+    },
+    d,
+  )
+  await d.recurring.update(rec.id, { lastMonth: date.slice(0, 7), updatedAt: Date.now() })
+  return id
+}
+
+/** ข้ามเดือนนี้ (ไม่บันทึก แต่ไม่ถามอีกจนกว่าจะถึงเดือนหน้า) */
+export async function skipRecurring(id: string, month: string, d: DaijodDB = db) {
+  await d.recurring.update(id, { lastMonth: month, updatedAt: Date.now() })
 }
 
 // ---------- หมวดหมู่ ----------
@@ -230,15 +301,17 @@ export interface Backup {
   wallets: Wallet[]
   transactions: Transaction[]
   categories: Category[]
+  recurrings?: Recurring[] // เพิ่มทีหลัง ไฟล์เก่าไม่มีก็นำเข้าได้
 }
 
 export async function exportBackup(d: DaijodDB = db): Promise<Backup> {
-  const [wallets, transactions, categories] = await Promise.all([
+  const [wallets, transactions, categories, recurrings] = await Promise.all([
     d.wallets.toArray(),
     d.transactions.toArray(),
     d.categories.toArray(),
+    d.recurring.toArray(),
   ])
-  return { app: 'daijod', version: 1, exportedAt: new Date().toISOString(), wallets, transactions, categories }
+  return { app: 'daijod', version: 1, exportedAt: new Date().toISOString(), wallets, transactions, categories, recurrings }
 }
 
 /** ตรวจไฟล์สำรองก่อนนำเข้า แล้วแทนที่ข้อมูลทั้งหมด */
@@ -265,10 +338,17 @@ export async function importBackup(data: unknown, d: DaijodDB = db) {
       throw new UserError('ข้อมูลรายการในไฟล์ไม่ถูกต้อง')
     }
   }
-  await d.transaction('rw', d.wallets, d.transactions, d.categories, async () => {
-    await Promise.all([d.wallets.clear(), d.transactions.clear(), d.categories.clear()])
+  const recurrings = Array.isArray(b.recurrings) ? b.recurrings : []
+  for (const r of recurrings) {
+    if (typeof r.id !== 'string' || typeof r.name !== 'string' || !Number.isSafeInteger(r.amount)) {
+      throw new UserError('ข้อมูลรายการประจำในไฟล์ไม่ถูกต้อง')
+    }
+  }
+  await d.transaction('rw', d.wallets, d.transactions, d.categories, d.recurring, async () => {
+    await Promise.all([d.wallets.clear(), d.transactions.clear(), d.categories.clear(), d.recurring.clear()])
     await d.wallets.bulkAdd(b.wallets!)
     await d.transactions.bulkAdd(b.transactions!)
     await d.categories.bulkAdd(b.categories!)
+    await d.recurring.bulkAdd(recurrings)
   })
 }

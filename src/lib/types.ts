@@ -41,5 +41,23 @@ export interface Category {
   budget?: number // งบต่อเดือน (สตางค์) ใช้กับหมวดรายจ่าย
 }
 
+/** รายการประจำ: ถึงวันที่กำหนดของทุกเดือน แอปจะถามให้บันทึกเป็นรายการจริง */
+export interface Recurring {
+  id: string
+  name: string
+  type: TransactionType
+  amount: number // สตางค์
+  day: number // วันที่ของเดือน 1–31 (เดือนที่สั้นกว่าใช้วันสุดท้าย)
+  note: string
+  categoryId?: string
+  sourceWalletId?: string
+  destinationWalletId?: string
+  active: boolean
+  lastMonth?: string // YYYY-MM ที่บันทึกหรือข้ามไปแล้วล่าสุด
+  createdAt: number
+  updatedAt: number
+}
+export type RecurringInput = Omit<Recurring, 'id' | 'createdAt' | 'updatedAt' | 'lastMonth'>
+
 export type TransactionInput = Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>
 export type WalletInput = Omit<Wallet, 'id' | 'createdAt' | 'updatedAt'>
