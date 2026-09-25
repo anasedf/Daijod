@@ -9,7 +9,7 @@ import { BANK_LABEL, parseStatement, SUPPORTED_BANKS } from '../lib/statement'
 import { counterparty, rememberChoices, suggestChoice, type Choice } from '../lib/statement/classify'
 import type { Statement, StatementTx } from '../lib/statement/kbank'
 import { findMatchingTransfer } from '../lib/statement/match'
-import type { TransactionInput } from '../lib/types'
+import type { Transaction, TransactionInput } from '../lib/types'
 import { errorMessage, FormError, Sheet, useToast } from './ui'
 
 type Status = 'new' | 'imported' | 'similar' | 'matched'
@@ -21,6 +21,8 @@ interface Row {
   choice: Choice
   selected: boolean
   status: Status
+  /** โอนที่มีอยู่แล้วซึ่งรายการนี้ตรงกัน (เมื่อ status = matched) */
+  matched?: Transaction
 }
 
 function encode(c: Choice) {
@@ -52,7 +54,7 @@ function buildRows(statement: Statement, data: AppData, walletId: string): Row[]
       )
     )
       status = 'similar'
-    return { tx, name: cp.name, key: cp.key, choice, selected: status === 'new', status }
+    return { tx, name: cp.name, key: cp.key, choice, selected: status === 'new', status, matched }
   })
 }
 
@@ -391,6 +393,12 @@ export function ImportSheet({ data, onClose, walletId: initialWallet }: { data: 
                       </span>
                     )}
                   </span>
+                  {r.matched && (
+                    <span className="block truncate text-xs text-brand">
+                      มีอยู่แล้วเป็น “โอน {data.walletMap.get(r.matched.sourceWalletId!)?.name} →{' '}
+                      {data.walletMap.get(r.matched.destinationWalletId!)?.name}” {formatDateShort(r.matched.date)} ไม่ต้องติ๊ก
+                    </span>
+                  )}
                   <span className="block truncate text-xs text-muted" title={r.tx.detail}>
                     <span className="md:hidden">
                       {formatDateShort(r.tx.date)} {r.tx.time} ·{' '}

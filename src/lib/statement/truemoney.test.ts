@@ -58,6 +58,8 @@ describe('describeTrueMoneyDetail', () => {
   it('แปลงรหัสเป็นข้อความ', () => {
     expect(describeTrueMoneyDetail('debit_kbank')).toBe('เติมเงินจาก กสิกร KBANK')
     expect(describeTrueMoneyDetail('debit_xyz')).toBe('เติมเงินจาก XYZ')
+    expect(describeTrueMoneyDetail('kbankimobiledd01')).toBe('เติมเงินจาก กสิกร KBANK')
+    expect(describeTrueMoneyDetail('topup_scb_promptpay')).toBe('เติมเงินจาก ไทยพาณิชย์ SCB')
     expect(describeTrueMoneyDetail('prepaidcard_master')).toBe('จ่ายผ่านบัตร TrueMoney Mastercard')
     expect(describeTrueMoneyDetail('im_onlinepayment_01 278')).toBe('ชำระออนไลน์')
     expect(describeTrueMoneyDetail('something else')).toBeNull()

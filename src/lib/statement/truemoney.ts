@@ -100,7 +100,8 @@ export function describeTrueMoneyDetail(detail: string): string | null {
     cimb: 'CIMB',
   }
   const d = detail.toLowerCase()
-  const bank = /^(?:debit|topup|bank)_([a-z]+)/.exec(d)?.[1]
+  // รูปแบบมีหลายอย่าง เช่น debit_kbank, kbankimobiledd01 -> หาชื่อธนาคารในรหัส
+  const bank = /^(?:debit|topup|bank)_([a-z]+)/.exec(d)?.[1] ?? Object.keys(BANKS).find((b) => d.startsWith(b) || d.includes(`_${b}`))
   if (bank) return `เติมเงินจาก ${BANKS[bank] ?? bank.toUpperCase()}`
   if (d.startsWith('prepaidcard_master')) return 'จ่ายผ่านบัตร TrueMoney Mastercard'
   if (d.startsWith('im_onlinepayment')) return 'ชำระออนไลน์'
