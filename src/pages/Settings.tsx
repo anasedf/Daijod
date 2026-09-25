@@ -383,7 +383,7 @@ export function SettingsPage({ data }: { data: AppData }) {
                     ))}
                   </ul>
                 ) : (
-                <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
+                <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
                   {cats.map((c) => (
                     <li
                       key={c.id}
@@ -400,7 +400,7 @@ export function SettingsPage({ data }: { data: AppData }) {
                       {/* มือถือ: ปุ่มอยู่ท้ายชิปเสมอ / จอใหญ่: ลอยทับด้านขวาเฉพาะตอนชี้ ไม่กินที่ชื่อ */}
                       <div className="flex items-center gap-0.5 lg:absolute lg:inset-y-0.5 lg:right-1 lg:rounded-lg lg:bg-surface lg:pl-1 lg:opacity-0 lg:group-focus-within:opacity-100 lg:group-hover:opacity-100">
                         <button
-                          className="icon-btn h-8 w-8"
+                          className="icon-btn hidden h-8 w-8 sm:inline-flex"
                           onClick={() => setEditing({ type, category: c })}
                           aria-label={`แก้ไข ${c.name}`}
                         >
