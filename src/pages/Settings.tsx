@@ -1,5 +1,6 @@
 import { Download, FileUp, HardDrive, Pencil, Plus, Trash2, TriangleAlert, Upload } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { ImportRules } from '../components/ImportRules'
 import { ImportSheet } from '../components/ImportSheet'
 import { CategoryIcon, errorMessage, FormError, PageHeader, Sheet, useConfirm, useToast } from '../components/ui'
 import type { AppData } from '../hooks/useData'
@@ -401,6 +402,8 @@ export function SettingsPage({ data }: { data: AppData }) {
               </section>
             )
           })}
+
+          <ImportRules data={data} />
 
           <section className="card border-expense/30 p-5">
             <div className="flex items-center gap-3">

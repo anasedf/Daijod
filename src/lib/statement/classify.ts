@@ -53,18 +53,58 @@ const KEYWORDS: [RegExp, string][] = [
 
 const RULES_KEY = 'importRules'
 const MAX_RULES = 500
+const KEYWORDS_KEY = 'importKeywords'
 
-function loadRules(): Record<string, Choice> {
+/** กฎที่ผู้ใช้ตั้งเอง: ถ้ารายละเอียดมีคำนี้ -> เลือกแบบนี้ */
+export interface KeywordRule {
+  pattern: string
+  choice: Choice
+}
+
+/** กฎที่จำจากการนำเข้าครั้งก่อน (คีย์คู่ค้า -> ตัวเลือก) */
+export function loadLearnedRules(): Record<string, Choice> {
   try {
-    return JSON.parse(getPref(RULES_KEY) ?? '{}')
+    const v = JSON.parse(getPref(RULES_KEY) ?? '{}')
+    return v && typeof v === 'object' ? v : {}
   } catch {
     return {}
   }
 }
 
+export function deleteLearnedRule(key: string) {
+  const rules = loadLearnedRules()
+  delete rules[key]
+  setPref(RULES_KEY, JSON.stringify(rules))
+}
+
+export function clearLearnedRules() {
+  setPref(RULES_KEY, '{}')
+}
+
+export function loadKeywordRules(): KeywordRule[] {
+  try {
+    const v = JSON.parse(getPref(KEYWORDS_KEY) ?? '[]')
+    return Array.isArray(v) ? v : []
+  } catch {
+    return []
+  }
+}
+
+export function saveKeywordRules(rules: KeywordRule[]) {
+  setPref(KEYWORDS_KEY, JSON.stringify(rules))
+}
+
+/** ชื่อคู่ค้าที่อ่านได้จากคีย์ เช่น "x6680|ร้านข้าว" -> "ร้านข้าว (X6680)" */
+export function describeRuleKey(key: string): string {
+  const named: Record<string, string> = { interest: 'ดอกเบี้ยเงินฝาก', 'cash-deposit': 'ฝากเงินสด', 'debit-card': 'บัตรเดบิต' }
+  if (named[key]) return named[key]
+  const [code, name] = key.split('|')
+  return code ? `${name} (${code.toUpperCase()})` : name ?? key
+}
+
 /** จำว่าผู้ใช้จัดคู่ค้าไหนเข้าหมวดไหน ครั้งหน้าจะได้เดาถูก */
 export function rememberChoices(entries: { key: string; choice: Choice }[]) {
-  const rules = loadRules()
+  const rules = loadLearnedRules()
   for (const { key, choice } of entries) {
     delete rules[key]
     rules[key] = choice
@@ -77,24 +117,45 @@ export function rememberChoices(entries: { key: string; choice: Choice }[]) {
 export function suggestChoice(
   tx: StatementTx,
   cp: Counterparty,
-  ctx: { walletId: string; wallets: Wallet[]; categories: Category[]; rules?: Record<string, Choice> },
+  ctx: {
+    walletId: string
+    wallets: Wallet[]
+    categories: Category[]
+    rules?: Record<string, Choice>
+    keywordRules?: KeywordRule[]
+  },
 ): Choice {
-  const rules = ctx.rules ?? loadRules()
+  const rules = ctx.rules ?? loadLearnedRules()
+  const keywordRules = ctx.keywordRules ?? loadKeywordRules()
   const hasCat = (id: string, type: 'expense' | 'income') => ctx.categories.some((c) => c.id === id && c.type === type)
   const others = ctx.wallets.filter((w) => w.id !== ctx.walletId)
 
-  const learned = rules[cp.key]
-  if (learned) {
-    if (learned.type === 'transfer' && others.some((w) => w.id === learned.walletId)) return learned
-    if (learned.type !== 'transfer' && learned.type === (tx.direction === 'in' ? 'income' : 'expense')) {
-      return { type: learned.type, categoryId: hasCat(learned.categoryId, learned.type) ? learned.categoryId : '' }
+  // ใช้ตัวเลือกจากกฎได้ไหม: โอนต้องมีกระเป๋าอยู่ รายรับ/รายจ่ายต้องตรงทิศทางเงิน
+  const fit = (c: Choice): Choice | null => {
+    if (c.type === 'transfer') return others.some((w) => w.id === c.walletId) ? c : null
+    if (c.type !== (tx.direction === 'in' ? 'income' : 'expense')) return null
+    return { type: c.type, categoryId: hasCat(c.categoryId, c.type) ? c.categoryId : '' }
+  }
+
+  // 1) สิ่งที่ผู้ใช้เคยเลือกให้คู่ค้านี้
+  const learned = rules[cp.key] && fit(rules[cp.key])
+  if (learned) return learned
+
+  const hay = `${tx.detail} ${cp.name}`.toLowerCase()
+  const squashed = squash(hay)
+
+  // 2) กฎคำที่ผู้ใช้ตั้งเอง
+  for (const r of keywordRules) {
+    const p = r.pattern.trim().toLowerCase()
+    if (!p) continue
+    if (hay.includes(p) || squashed.includes(squash(p))) {
+      const c = fit(r.choice)
+      if (c) return c
     }
   }
 
-  // ชื่อคู่ค้าตรงกับชื่อกระเป๋าอื่นของเรา (เช่น เติม TrueMoney) -> น่าจะเป็นการโอน
+  // 3) ชื่อคู่ค้าตรงกับชื่อกระเป๋าอื่นของเรา (เช่น เติม TrueMoney) -> น่าจะเป็นการโอน
   // เทียบแบบไม่สนช่องว่างและจุด เพื่อให้ "TrueMoney" จับ "TRUE MONEY CO., LTD" ได้
-  const hay = `${tx.detail} ${cp.name}`.toLowerCase()
-  const squashed = squash(hay)
   const wallet = others.find((w) => squash(w.name).length >= 3 && squashed.includes(squash(w.name)))
   if (wallet) return { type: 'transfer', walletId: wallet.id }
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_CATEGORIES } from '../db'
 import type { Wallet } from '../types'
-import { counterparty, suggestChoice } from './classify'
+import { counterparty, describeRuleKey, suggestChoice, type KeywordRule } from './classify'
 import type { StatementTx } from './kbank'
 
 function tx(over: Partial<StatementTx>): StatementTx {
@@ -40,6 +40,12 @@ describe('counterparty', () => {
     expect(a.key).toBe(b.key)
   })
 
+  it('อธิบายคีย์กฎให้อ่านง่าย', () => {
+    expect(describeRuleKey('x6680|ร้านข้าว')).toBe('ร้านข้าว (X6680)')
+    expect(describeRuleKey('|line man')).toBe('line man')
+    expect(describeRuleKey('debit-card')).toBe('บัตรเดบิต')
+  })
+
   it('คีย์รวมรหัสบัญชีเพื่อแยกคนชื่อซ้ำ', () => {
     const a = counterparty(tx({ detail: 'โอนไป พร้อมเพย์ X1111 นาย ก' }))
     const b = counterparty(tx({ detail: 'โอนไป พร้อมเพย์ X2222 นาย ก' }))
@@ -49,7 +55,19 @@ describe('counterparty', () => {
 })
 
 describe('suggestChoice', () => {
-  const suggest = (t: StatementTx, rules = {}) => suggestChoice(t, counterparty(t), { ...ctx, rules })
+  const suggest = (t: StatementTx, rules = {}, keywordRules: KeywordRule[] = []) =>
+    suggestChoice(t, counterparty(t), { ...ctx, rules, keywordRules })
+
+  it('กฎคำที่ผู้ใช้ตั้งเองมาก่อนกฎในตัว แต่หลังสิ่งที่เคยเลือก', () => {
+    const t = tx({ detail: 'เพื่อชำระ Ref X1 ร้านข้าวมันไก่' })
+    const kw: KeywordRule[] = [{ pattern: 'ข้าวมันไก่', choice: { type: 'expense', categoryId: 'exp-fun' } }]
+    expect(suggest(t, {}, kw)).toEqual({ type: 'expense', categoryId: 'exp-fun' })
+    expect(suggest(t, { [counterparty(t).key]: { type: 'expense', categoryId: 'exp-home' } }, kw)).toEqual({ type: 'expense', categoryId: 'exp-home' })
+    // เทียบแบบไม่สนช่องว่างและตัวพิมพ์
+    expect(suggest(tx({ detail: 'โอนไป X2 TRUE MONEY CO' }), {}, [{ pattern: 'truemoney', choice: { type: 'transfer', walletId: 'tm' } }])).toEqual({ type: 'transfer', walletId: 'tm' })
+    // กฎรายจ่ายไม่ใช้กับเงินเข้า
+    expect(suggest({ ...t, direction: 'in' }, {}, kw)).toEqual({ type: 'income', categoryId: 'inc-other' })
+  })
 
   it('เดาหมวดจากคำในรายละเอียด', () => {
     expect(suggest(tx({ detail: 'เพื่อชำระ Ref X1 ร้านข้าวมันไก่' }))).toEqual({ type: 'expense', categoryId: 'exp-food' })
