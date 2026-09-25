@@ -93,9 +93,20 @@
   html {
     color-scheme: light;
     -webkit-tap-highlight-color: transparent;
+    /* กันหน้าเลื่อนซ้าย-ขวาบนมือถือ (ทำให้แถบเมนูล่างโดนตัด) */
+    overflow-x: clip;
   }
   body {
     @apply bg-canvas font-sans text-ink antialiased;
+    overflow-x: clip;
+  }
+  /* iOS ซูมหน้าเองเมื่อแตะช่องกรอกที่ตัวอักษรเล็กกว่า 16px แล้วซูมค้าง → บังคับ 16px บนจอสัมผัส */
+  @media (max-width: 1023px) {
+    input,
+    select,
+    textarea {
+      font-size: max(16px, 1em);
+    }
   }
   fieldset {
     min-width: 0;

@@ -88,19 +88,21 @@ export function HistoryPage({ data, onOpen }: { data: AppData; onOpen: (t: Trans
         subtitle={`ทั้งหมด ${data.transactions.length} รายการ`}
         actions={
           <>
+            {/* ปุ่มเครื่องมือเป็นไอคอนกลม ไม่แย่งที่ตัวเลือกช่วงเวลา */}
             {data.transactions.length > 0 && (
               <button
                 type="button"
-                className={`order-last sm:order-first ${selected ? 'btn-primary' : 'btn-secondary'}`}
+                className={`${selected ? 'btn-primary' : 'btn-secondary'} min-h-10 px-3 text-sm`}
                 onClick={() => setSelected(selected ? null : new Set())}
                 aria-pressed={!!selected}
+                title="เลือกหลายรายการ"
               >
-                <CheckSquare size={18} aria-hidden /> {selected ? 'เลิกเลือก' : 'เลือก'}
+                <CheckSquare size={17} aria-hidden /> {selected ? 'เลิกเลือก' : 'เลือก'}
               </button>
             )}
             {data.wallets.length > 0 && !selected && (
-              <button type="button" className="btn-secondary order-last sm:order-first" onClick={() => setImporting(true)}>
-                <FileUp size={18} aria-hidden /> นำเข้า statement
+              <button type="button" className="btn-secondary min-h-10 px-3 text-sm" onClick={() => setImporting(true)} title="นำเข้า statement">
+                <FileUp size={17} aria-hidden /> <span className="hidden sm:inline">นำเข้า</span>
               </button>
             )}
             <RangePicker value={range} onChange={setRange} showAll className="w-full sm:w-auto sm:justify-end" />
@@ -109,34 +111,33 @@ export function HistoryPage({ data, onOpen }: { data: AppData; onOpen: (t: Trans
       />
       {importing && <ImportSheet data={data} onClose={() => setImporting(false)} />}
 
-      <section className="card mb-6 overflow-hidden" aria-label="สรุปผลที่แสดง">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line/70 px-5 py-3">
-          <h2 className="card-title">สรุปผลที่แสดง</h2>
-          <span className="text-xs text-muted">ยอดรับ–จ่ายไม่นับการโอนและเงินยืม</span>
-        </div>
-        <dl className="history-summary">
-          <div><dt>จำนวนรายการ</dt><dd className="num">{results.length}<span className="ml-2 text-sm font-normal text-muted">รายการ</span></dd></div>
-          <div><dt>รายรับ</dt><dd className="num text-income">+{formatBaht(sum.income)}</dd></div>
-          <div><dt>รายจ่าย</dt><dd className="num text-expense">−{formatBaht(sum.expense)}</dd></div>
-          <div className="bg-brand-soft/40"><dt>สุทธิ</dt><dd className={`num ${sum.net < 0 ? 'text-expense' : 'text-brand'}`}>{formatBaht(sum.net, { sign: true })}</dd></div>
-        </dl>
-      </section>
       <div className="card overflow-hidden">
         <div className="min-w-0">
           {/* ค้นหา + ตัวกรอง */}
-          <div className="grid gap-3 p-4 md:p-5 xl:grid-cols-[minmax(0,1fr)_auto]">
-            <div className="relative flex-1">
-              <Search size={18} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted" aria-hidden />
-              <input
-                type="search"
-                className="field pl-10"
-                placeholder="ค้นหาชื่อ โน้ต หมวด หรือกระเป๋า"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                aria-label="ค้นหา"
-              />
+          <div className="grid gap-2 p-3 md:p-4 xl:grid-cols-[minmax(0,1fr)_auto]">
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Search size={18} className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-muted" aria-hidden />
+                <input
+                  type="search"
+                  className="field min-h-10 pl-10"
+                  placeholder="ค้นหาชื่อ โน้ต หมวด หรือกระเป๋า"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  aria-label="ค้นหา"
+                />
+              </div>
+              <button
+                type="button"
+                className={`btn-secondary min-h-10 shrink-0 px-3 sm:hidden ${type || walletId || categoryId ? 'text-accent-strong' : ''}`}
+                aria-expanded={showFilters}
+                aria-controls="history-filters"
+                aria-label="ตัวกรอง"
+                onClick={() => setShowFilters(!showFilters)}
+              >
+                <SlidersHorizontal size={17} aria-hidden />
+              </button>
             </div>
-            <button type="button" className="btn-secondary sm:hidden" aria-expanded={showFilters} aria-controls="history-filters" onClick={() => setShowFilters(!showFilters)}><SlidersHorizontal size={16} aria-hidden /> ตัวกรอง{(type || walletId || categoryId) ? ' · ใช้งานอยู่' : ''}</button>
             <div id="history-filters" className={`${showFilters ? 'grid' : 'hidden'} grid-cols-1 gap-2 sm:grid sm:grid-cols-3`}>
               <select
                 className="field text-sm xl:w-32"
@@ -186,9 +187,23 @@ export function HistoryPage({ data, onOpen }: { data: AppData; onOpen: (t: Trans
             </div>
           </div>
 
-          <div className="flex items-center justify-between gap-3 border-t border-line/70 px-4 py-3 text-sm md:px-5">
-            <span className="text-ink-2">{filtered ? 'ผลการค้นหา' : 'รายการทั้งหมด'} <b className="num font-semibold text-ink">{results.length}</b> รายการ <span className="hidden text-muted sm:inline">· เรียงจากล่าสุด</span></span>
-            {filtered && <button className="inline-flex min-h-9 shrink-0 items-center gap-1 rounded-lg px-2 font-medium text-brand hover:bg-brand-soft" onClick={reset}><X size={15} aria-hidden /> ล้างตัวกรอง</button>}
+          {/* สรุปผลที่แสดงในบรรทัดเดียว */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line/70 px-4 py-2.5 text-sm md:px-5">
+            <span className="text-ink-2">
+              <b className="num font-semibold text-ink">{results.length}</b> รายการ
+            </span>
+            {results.length > 0 && (
+              <>
+                <span className="num text-income">+{formatBaht(sum.income)}</span>
+                <span className="num text-expense">−{formatBaht(sum.expense)}</span>
+                <span className={`num ${sum.net < 0 ? 'text-expense' : 'text-ink'}`}>สุทธิ {formatBaht(sum.net, { sign: true })}</span>
+              </>
+            )}
+            {filtered && (
+              <button className="ml-auto inline-flex min-h-8 shrink-0 items-center gap-1 rounded-lg px-2 text-xs font-medium text-accent-strong hover:bg-accent-soft" onClick={reset}>
+                <X size={14} aria-hidden /> ล้างตัวกรอง
+              </button>
+            )}
           </div>
           {results.length === 0 ? (
             <div className="border-t border-line/70">
@@ -212,8 +227,6 @@ export function HistoryPage({ data, onOpen }: { data: AppData; onOpen: (t: Trans
             <TransactionList transactions={results} data={data} onOpen={onOpen} selection={selection} flat />
           )}
         </div>
-
-
       </div>
 
       {/* แถบคำสั่งตอนเลือกหลายรายการ */}

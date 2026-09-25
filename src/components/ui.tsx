@@ -94,8 +94,8 @@ export function PageHeader({
   return (
     <header className="mb-5 flex flex-wrap items-end justify-between gap-x-6 gap-y-3 lg:mb-8">
       <div className="min-w-0">
-        <h1 className="text-3xl font-semibold tracking-tight lg:text-4xl">{title}</h1>
-        {subtitle && <p className="mt-2 text-sm text-muted">{subtitle}</p>}
+        <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">{title}</h1>
+        {subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}
       </div>
       {actions && <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">{actions}</div>}
     </header>

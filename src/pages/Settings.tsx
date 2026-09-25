@@ -1,4 +1,23 @@
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronRight, Download, FileUp, HardDrive, Pencil, Plus, Trash2, Upload, Wallet } from 'lucide-react'
+import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowUp,
+  ArrowUpDown,
+  CalendarClock,
+  ChevronRight,
+  Download,
+  FileUp,
+  HardDrive,
+  Pencil,
+  Plus,
+  Tags,
+  Trash2,
+  TriangleAlert,
+  Upload,
+  Wallet,
+  Wand2,
+  type LucideIcon,
+} from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { DangerZone } from '../components/DangerZone'
 import { ImportRules } from '../components/ImportRules'
@@ -277,14 +296,32 @@ function CategoryForm({
   )
 }
 
+type Section = 'categories' | 'recurring' | 'rules' | 'backup' | 'danger'
+
+const SECTIONS: { id: Section | 'wallets' | 'import'; label: string; hint: (d: AppData) => string; Icon: LucideIcon; tone: string }[] = [
+  { id: 'wallets', label: 'กระเป๋า', hint: (d) => `${d.wallets.length} กระเป๋า · รวม ${formatBaht(d.total)}`, Icon: Wallet, tone: 'bg-accent-soft text-accent-strong' },
+  { id: 'categories', label: 'หมวดหมู่', hint: (d) => `${d.categories.length} หมวด · ไอคอน สี งบ ลำดับ`, Icon: Tags, tone: 'bg-sun-soft text-ink' },
+  { id: 'recurring', label: 'รายการประจำ', hint: (d) => (d.recurrings.length ? `${d.recurrings.length} รายการ` : 'ค่าห้อง ค่าเน็ต เงินเดือน'), Icon: CalendarClock, tone: 'bg-income-soft text-income' },
+  { id: 'import', label: 'นำเข้า statement', hint: () => 'กสิกรไทย, TrueMoney', Icon: FileUp, tone: 'bg-transfer-soft text-transfer' },
+  { id: 'rules', label: 'กฎจัดหมวด', hint: () => 'ใช้ตอนนำเข้า statement', Icon: Wand2, tone: 'bg-brand-soft text-ink' },
+  { id: 'backup', label: 'สำรองข้อมูล', hint: () => 'ดาวน์โหลด / นำเข้าไฟล์สำรอง', Icon: HardDrive, tone: 'bg-brand-soft text-ink' },
+  { id: 'danger', label: 'ลบข้อมูล', hint: () => 'ลบรายการ หรือเริ่มใหม่', Icon: TriangleAlert, tone: 'bg-expense-soft text-expense' },
+]
+
+/** หน้าตั้งค่าแบบ iOS: มือถือเป็นรายการหัวข้อแตะเข้าไปทีละเรื่อง จอใหญ่เป็นสองคอลัมน์ */
 export function SettingsPage({ data, onNavigate }: { data: AppData; onNavigate?: (tab: Tab) => void }) {
   const toast = useToast()
   const confirm = useConfirm()
   const fileInput = useRef<HTMLInputElement>(null)
+  const [section, setSection] = useState<Section | null>(null)
   const [editing, setEditing] = useState<{ type: CategoryType; category?: Category } | null>(null)
   const [deleting, setDeleting] = useState<Category | null>(null)
   const [importing, setImporting] = useState(false)
   const [sorting, setSorting] = useState<CategoryType | null>(null)
+
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [section])
 
   /** สลับตำแหน่งหมวดกับตัวข้าง ๆ แล้วบันทึกลำดับใหม่ทั้งชุด */
   async function move(cats: Category[], i: number, delta: number) {
@@ -339,77 +376,87 @@ export function SettingsPage({ data, onNavigate }: { data: AppData; onNavigate?:
     }
   }
 
-  return (
-    <>
-      <PageHeader title="ตั้งค่า" subtitle="กระเป๋า หมวดหมู่ และการสำรองข้อมูล" />
+  function open(id: (typeof SECTIONS)[number]['id']) {
+    if (id === 'wallets') return onNavigate?.('wallets')
+    if (id === 'import') return setImporting(true)
+    setSection(id)
+  }
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-5">
-        <div className="space-y-4 lg:space-y-5">
-          {/* มือถือไม่มีแท็บกระเป๋า ให้เข้าจากตรงนี้ */}
-          {onNavigate && (
-            <button
-              type="button"
-              onClick={() => onNavigate('wallets')}
-              className="card flex w-full items-center gap-3 p-4 text-left transition-colors hover:bg-sunken lg:hidden"
-            >
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent-soft text-accent-strong" aria-hidden>
-                <Wallet size={20} />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block font-semibold">กระเป๋า</span>
-                <span className="block text-xs text-muted">
-                  {data.wallets.length} กระเป๋า · รวม {formatBaht(data.total)}
-                </span>
-              </span>
-              <ChevronRight size={18} className="text-muted" aria-hidden />
-            </button>
-          )}
-          {(['expense', 'income'] as CategoryType[]).map((type) => {
-            const cats = data.categories.filter((c) => c.type === type)
-            return (
-              <section key={type} className="card p-5">
-                <div className="mb-4 flex items-center justify-between gap-2">
-                  <div>
-                    <h2 className="card-title">หมวด{type === 'income' ? 'รายรับ' : 'รายจ่าย'}</h2>
-                    <p className="text-xs text-muted">{cats.length} หมวด</p>
-                  </div>
-                  <div className="-mr-2 flex">
-                    {cats.length > 1 && (
-                      <button
-                        className={`btn-ghost min-h-9 px-3 text-sm ${sorting === type ? 'text-brand' : ''}`}
-                        onClick={() => setSorting(sorting === type ? null : type)}
-                        aria-pressed={sorting === type}
-                      >
-                        <ArrowUpDown size={16} aria-hidden /> {sorting === type ? 'เสร็จ' : 'จัดเรียง'}
-                      </button>
-                    )}
-                    <button className="btn-ghost min-h-9 px-3 text-sm text-brand" onClick={() => setEditing({ type })}>
-                      <Plus size={16} aria-hidden /> เพิ่มหมวด
-                    </button>
-                  </div>
+  const active: Section = section ?? 'categories'
+  const activeMeta = SECTIONS.find((s) => s.id === active)!
+
+  const menu = (
+    <ul className="card divide-y divide-line/70 overflow-hidden">
+      {SECTIONS.map((s) => (
+        <li key={s.id}>
+          <button
+            type="button"
+            onClick={() => open(s.id)}
+            aria-current={s.id === active && (section !== null || true) ? 'true' : undefined}
+            className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-sunken ${
+              s.id === active ? 'lg:bg-sunken' : ''
+            }`}
+          >
+            <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${s.tone}`} aria-hidden>
+              <s.Icon size={18} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-medium">{s.label}</span>
+              <span className="block truncate text-xs text-muted">{s.hint(data)}</span>
+            </span>
+            <ChevronRight size={17} className="shrink-0 text-muted" aria-hidden />
+          </button>
+        </li>
+      ))}
+    </ul>
+  )
+
+  const content =
+    active === 'categories' ? (
+      <div className="space-y-4">
+        {(['expense', 'income'] as CategoryType[]).map((type) => {
+          const cats = data.categories.filter((c) => c.type === type)
+          return (
+            <section key={type} className="card p-5">
+              <div className="mb-4 flex items-center justify-between gap-2">
+                <div>
+                  <h2 className="card-title">หมวด{type === 'income' ? 'รายรับ' : 'รายจ่าย'}</h2>
+                  <p className="text-xs text-muted">{cats.length} หมวด · แตะเพื่อแก้ไข</p>
                 </div>
-                {sorting === type ? (
-                  <ul className="divide-y divide-line/70 rounded-xl border border-line">
-                    {cats.map((c, i) => (
-                      <li key={c.id} className="flex items-center gap-2.5 py-1.5 pr-1.5 pl-3">
-                        <CategoryIcon category={c} size="sm" />
-                        <span className="min-w-0 flex-1 truncate text-sm">{c.name}</span>
-                        <button className="icon-btn h-8 w-8" disabled={i === 0} onClick={() => move(cats, i, -1)} aria-label={`เลื่อน ${c.name} ขึ้น`}>
-                          <ArrowUp size={16} />
-                        </button>
-                        <button className="icon-btn h-8 w-8" disabled={i === cats.length - 1} onClick={() => move(cats, i, 1)} aria-label={`เลื่อน ${c.name} ลง`}>
-                          <ArrowDown size={16} />
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                  {cats.map((c) => (
-                    <li
-                      key={c.id}
-                      className="group relative flex items-center gap-0.5 rounded-xl border border-line pr-1 pl-2.5 transition-colors hover:border-brand/40"
+                <div className="-mr-2 flex">
+                  {cats.length > 1 && (
+                    <button
+                      className={`btn-ghost min-h-9 px-3 text-sm ${sorting === type ? 'text-accent-strong' : ''}`}
+                      onClick={() => setSorting(sorting === type ? null : type)}
+                      aria-pressed={sorting === type}
                     >
+                      <ArrowUpDown size={16} aria-hidden /> {sorting === type ? 'เสร็จ' : 'จัดเรียง'}
+                    </button>
+                  )}
+                  <button className="btn-ghost min-h-9 px-3 text-sm" onClick={() => setEditing({ type })}>
+                    <Plus size={16} aria-hidden /> เพิ่ม
+                  </button>
+                </div>
+              </div>
+              {sorting === type ? (
+                <ul className="divide-y divide-line/70 rounded-2xl border border-line">
+                  {cats.map((c, i) => (
+                    <li key={c.id} className="flex items-center gap-2.5 py-1.5 pr-1.5 pl-3">
+                      <CategoryIcon category={c} size="sm" />
+                      <span className="min-w-0 flex-1 truncate text-sm">{c.name}</span>
+                      <button className="icon-btn h-8 w-8" disabled={i === 0} onClick={() => move(cats, i, -1)} aria-label={`เลื่อน ${c.name} ขึ้น`}>
+                        <ArrowUp size={16} />
+                      </button>
+                      <button className="icon-btn h-8 w-8" disabled={i === cats.length - 1} onClick={() => move(cats, i, 1)} aria-label={`เลื่อน ${c.name} ลง`}>
+                        <ArrowDown size={16} />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <ul className="divide-y divide-line/70 rounded-2xl border border-line">
+                  {cats.map((c) => (
+                    <li key={c.id} className="group flex items-center gap-1 pr-1.5 pl-3">
                       <button
                         className="flex min-w-0 flex-1 items-center gap-2.5 py-2 text-left text-sm"
                         onClick={() => setEditing({ type, category: c })}
@@ -417,99 +464,97 @@ export function SettingsPage({ data, onNavigate }: { data: AppData; onNavigate?:
                       >
                         <CategoryIcon category={c} size="sm" />
                         <span className="truncate">{c.name}</span>
+                        {c.budget ? <span className="num ml-auto pr-2 text-xs text-muted">งบ {formatBaht(c.budget)}</span> : null}
                       </button>
-                      {/* มือถือ: ปุ่มอยู่ท้ายชิปเสมอ / จอใหญ่: ลอยทับด้านขวาเฉพาะตอนชี้ ไม่กินที่ชื่อ */}
-                      <div className="flex items-center gap-0.5 lg:absolute lg:inset-y-0.5 lg:right-1 lg:rounded-lg lg:bg-surface lg:pl-1 lg:opacity-0 lg:group-focus-within:opacity-100 lg:group-hover:opacity-100">
-                        <button
-                          className="icon-btn hidden h-8 w-8 sm:inline-flex"
-                          onClick={() => setEditing({ type, category: c })}
-                          aria-label={`แก้ไข ${c.name}`}
-                        >
-                          <Pencil size={15} />
-                        </button>
-                        <button
-                          className="icon-btn h-8 w-8 hover:text-expense"
-                          onClick={() => setDeleting(c)}
-                          aria-label={`ลบ ${c.name}`}
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
+                      <button className="icon-btn hidden h-8 w-8 sm:inline-flex" onClick={() => setEditing({ type, category: c })} aria-label={`แก้ไข ${c.name}`}>
+                        <Pencil size={15} />
+                      </button>
+                      <button className="icon-btn h-8 w-8 hover:text-expense" onClick={() => setDeleting(c)} aria-label={`ลบ ${c.name}`}>
+                        <Trash2 size={15} />
+                      </button>
                     </li>
                   ))}
                 </ul>
-                )}
-              </section>
-            )
-          })}
-
-          <RecurringSection data={data} />
-
-          <ImportRules data={data} />
-
-          <DangerZone data={data} />
+              )}
+            </section>
+          )
+        })}
+      </div>
+    ) : active === 'recurring' ? (
+      <RecurringSection data={data} />
+    ) : active === 'rules' ? (
+      <ImportRules data={data} />
+    ) : active === 'danger' ? (
+      <DangerZone data={data} />
+    ) : (
+      <section className="card p-5">
+        <h2 className="card-title">สำรองข้อมูล</h2>
+        <p className="mt-2 text-sm text-ink-2">
+          ข้อมูลทั้งหมดเก็บอยู่ในเบราว์เซอร์ของเครื่องนี้เท่านั้น ถ้าล้างข้อมูลเบราว์เซอร์หรือเปลี่ยนเครื่อง ข้อมูลจะหาย
+          ควรสำรองเก็บไว้เป็นระยะ (เช่น อัปโหลดขึ้น Google Drive)
+        </p>
+        <dl className="mt-4 grid grid-cols-3 gap-2 text-center">
+          <div className="rounded-2xl bg-sunken p-3">
+            <dt className="text-xs text-muted">กระเป๋า</dt>
+            <dd className="num text-lg font-semibold">{data.wallets.length}</dd>
+          </div>
+          <div className="rounded-2xl bg-sunken p-3">
+            <dt className="text-xs text-muted">รายการ</dt>
+            <dd className="num text-lg font-semibold">{data.transactions.length}</dd>
+          </div>
+          <div className="rounded-2xl bg-sunken p-3">
+            <dt className="text-xs text-muted">สำรองล่าสุด</dt>
+            <dd className="mt-1 text-xs font-medium">{lastBackup ? formatTimestamp(lastBackup) : 'ยังไม่เคย'}</dd>
+          </div>
+        </dl>
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+          <button className="btn-primary flex-1" onClick={exportFile}>
+            <Download size={18} aria-hidden /> ดาวน์โหลดไฟล์สำรอง
+          </button>
+          <button className="btn-secondary flex-1" onClick={() => fileInput.current?.click()}>
+            <Upload size={18} aria-hidden /> นำเข้าจากไฟล์สำรอง
+          </button>
         </div>
+        <input
+          ref={fileInput}
+          type="file"
+          accept="application/json,.json"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0]
+            e.target.value = ''
+            if (f) importFile(f)
+          }}
+        />
+      </section>
+    )
 
-        <div className="space-y-4 lg:sticky lg:top-8 lg:space-y-5">
-          <section className="card p-5">
-            <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-soft text-brand" aria-hidden>
-                <FileUp size={20} />
-              </span>
-              <h2 className="card-title">นำเข้าจาก statement</h2>
-            </div>
-            <p className="mt-3 text-sm text-ink-2">
-              อ่านรายการจากไฟล์ statement (กสิกรไทย, TrueMoney) แล้วตรวจก่อนบันทึก ไฟล์ถูกอ่านในเครื่องนี้เท่านั้น
-            </p>
-            <button className="btn-secondary mt-4 w-full" onClick={() => setImporting(true)} disabled={data.wallets.length === 0}>
-              <FileUp size={18} aria-hidden /> เลือกไฟล์ statement
+  return (
+    <>
+      {/* มือถือ: หน้ารายการหัวข้อ หรือหน้าย่อยพร้อมปุ่มย้อนกลับ */}
+      <div className="lg:hidden">
+        {section === null ? (
+          <>
+            <PageHeader title="ตั้งค่า" />
+            {menu}
+          </>
+        ) : (
+          <>
+            <button type="button" className="btn-ghost -ml-3 mb-2 min-h-9 px-3 text-sm" onClick={() => setSection(null)}>
+              <ArrowLeft size={16} aria-hidden /> ตั้งค่า
             </button>
-          </section>
+            <PageHeader title={activeMeta.label} />
+            {content}
+          </>
+        )}
+      </div>
 
-          <section className="card p-5">
-            <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-soft text-brand" aria-hidden>
-                <HardDrive size={20} />
-              </span>
-              <h2 className="card-title">สำรองข้อมูล</h2>
-            </div>
-            <p className="mt-3 text-sm text-ink-2">
-              ข้อมูลทั้งหมดเก็บอยู่ในเบราว์เซอร์ของเครื่องนี้เท่านั้น ถ้าล้างข้อมูลเบราว์เซอร์หรือเปลี่ยนเครื่อง
-              ข้อมูลจะหาย ควรสำรองเก็บไว้เป็นระยะ
-            </p>
-            <dl className="mt-4 grid grid-cols-2 gap-2 text-center">
-              <div className="rounded-xl bg-sunken p-3">
-                <dt className="text-xs text-muted">กระเป๋า</dt>
-                <dd className="num text-lg font-semibold">{data.wallets.length}</dd>
-              </div>
-              <div className="rounded-xl bg-sunken p-3">
-                <dt className="text-xs text-muted">รายการ</dt>
-                <dd className="num text-lg font-semibold">{data.transactions.length}</dd>
-              </div>
-            </dl>
-            <div className="mt-4 space-y-2">
-              <button className="btn-primary w-full" onClick={exportFile}>
-                <Download size={18} aria-hidden /> ดาวน์โหลดไฟล์สำรอง
-              </button>
-              <button className="btn-secondary w-full" onClick={() => fileInput.current?.click()}>
-                <Upload size={18} aria-hidden /> นำเข้าจากไฟล์สำรอง
-              </button>
-            </div>
-            <p className="mt-3 text-center text-xs text-muted">
-              สำรองล่าสุด: {lastBackup ? formatTimestamp(lastBackup) : 'ยังไม่เคย'}
-            </p>
-            <input
-              ref={fileInput}
-              type="file"
-              accept="application/json,.json"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0]
-                e.target.value = ''
-                if (f) importFile(f)
-              }}
-            />
-          </section>
+      {/* จอใหญ่: สองคอลัมน์ */}
+      <div className="hidden lg:block">
+        <PageHeader title="ตั้งค่า" />
+        <div className="grid grid-cols-[17rem_minmax(0,1fr)] items-start gap-5">
+          <div className="sticky top-8">{menu}</div>
+          {content}
         </div>
       </div>
 

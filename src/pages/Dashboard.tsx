@@ -1,5 +1,5 @@
-import { ChevronRight, Download, HardDrive, ReceiptText, Wallet, Zap } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { ArrowDownLeft, CalendarDays, ChevronRight, Download, HardDrive, ReceiptText, Scale, Wallet, Zap } from 'lucide-react'
+import { useMemo, useState, type ReactNode } from 'react'
 import type { Tab } from '../App'
 import { CardHeader, categorySlices } from '../components/insights'
 import { TransactionList } from '../components/TransactionList'
@@ -9,7 +9,7 @@ import { backupReminder, downloadBackup, snoozeBackupReminder } from '../lib/bac
 import { budgetSummary } from '../lib/budget'
 import { formatDateLong, formatDateShort, monthRange, todayISO } from '../lib/dates'
 import { addTransaction, db, postRecurring, skipRecurring } from '../lib/db'
-import { TX_META } from '../lib/labels'
+import { TX_META, WALLET_TYPES } from '../lib/labels'
 import { expenseByCategory, filterTransactions, sortNewestFirst, summarize } from '../lib/ledger'
 import { loanCategoryIds } from '../lib/loans'
 import { formatBaht } from '../lib/money'
@@ -258,21 +258,60 @@ function MonthCard({ data, onNavigate }: { data: AppData; onNavigate: (tab: Tab)
         </div>
       )}
 
-      <dl className="mt-6 grid grid-cols-3 gap-3 border-t border-line pt-4">
-        <div>
-          <dt className="text-xs text-muted">รายรับ</dt>
-          <dd className="num mt-0.5 text-base font-semibold text-income">+{formatBaht(sum.income)}</dd>
-        </div>
-        <div>
-          <dt className="text-xs text-muted">สุทธิ</dt>
-          <dd className={`num mt-0.5 text-base font-semibold ${sum.net < 0 ? 'text-expense' : ''}`}>{formatBaht(sum.net, { sign: true })}</dd>
-        </div>
-        <div>
-          <dt className="text-xs text-muted">{perDay !== null ? 'ใช้ได้อีกวันละ' : 'เฉลี่ยวันละ'}</dt>
-          <dd className="num mt-0.5 text-base font-semibold">{formatBaht(perDay ?? avgPerDay)}</dd>
-        </div>
+      {/* กล่องย่อย 3 ใบ แบบงานอ้างอิง: ไอคอน + ตัวเลข + แถบสัดส่วน */}
+      <dl className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
+        <MiniTile label="รายรับ" value={`+${formatBaht(sum.income)}`} tone="bg-income-soft text-income" bar={sum.income + sum.expense ? sum.income / (sum.income + sum.expense) : 0} barTone="bg-income" icon={<ArrowDownLeft size={15} strokeWidth={2.4} />} />
+        <MiniTile
+          label="สุทธิ"
+          value={formatBaht(sum.net, { sign: true })}
+          tone={sum.net < 0 ? 'bg-expense-soft text-expense' : 'bg-sunken text-ink-2'}
+          valueTone={sum.net < 0 ? 'text-expense' : ''}
+          icon={<Scale size={15} strokeWidth={2.2} />}
+        />
+        <MiniTile
+          label={perDay !== null ? 'ใช้ได้อีกวันละ' : 'เฉลี่ยวันละ'}
+          value={formatBaht(perDay ?? avgPerDay)}
+          tone="bg-accent-soft text-accent-strong"
+          icon={<CalendarDays size={15} strokeWidth={2.2} />}
+          className="col-span-2 sm:col-span-1"
+        />
       </dl>
     </section>
+  )
+}
+
+function MiniTile({
+  label,
+  value,
+  icon,
+  tone,
+  valueTone = '',
+  bar,
+  barTone = 'bg-chart',
+  className = '',
+}: {
+  label: string
+  value: string
+  icon: ReactNode
+  tone: string
+  valueTone?: string
+  bar?: number
+  barTone?: string
+  className?: string
+}) {
+  return (
+    <div className={`rounded-2xl bg-sunken/70 p-3 ${className}`}>
+      <span className={`flex h-7 w-7 items-center justify-center rounded-full ${tone}`} aria-hidden>
+        {icon}
+      </span>
+      <dt className="mt-2.5 text-xs text-muted">{label}</dt>
+      <dd className={`num mt-0.5 text-base font-semibold whitespace-nowrap ${valueTone}`}>{value}</dd>
+      {bar !== undefined && (
+        <div className="mt-2 h-1.5 rounded-full bg-chart-track" aria-hidden>
+          <div className={`h-1.5 rounded-full ${barTone}`} style={{ width: `${Math.max(2, Math.min(100, bar * 100))}%` }} />
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -288,7 +327,7 @@ function TopCategories({ data, onNavigate }: { data: AppData; onNavigate: (tab: 
   const max = slices[0].amount
 
   return (
-    <section className="card lg:col-span-5">
+    <section className="card lg:col-span-7">
       <CardHeader
         title="จ่ายไปกับอะไร"
         subtitle="เดือนนี้"
@@ -359,45 +398,66 @@ export function DashboardPage({
         <BackupBanner data={data} />
         <DueRecurrings data={data} onOpen={onOpen} />
 
-        {/* ยอดคงเหลือรวม + กระเป๋า */}
+        {/* บัตรยอดคงเหลือ: แบบบัตรธนาคาร มีวงกลมตกแต่งจาง ๆ */}
         <section className="hero-card relative overflow-hidden rounded-3xl p-5 sm:p-6 lg:col-span-5">
-          <div className="flex items-center justify-between gap-3">
-            <span className="inline-flex items-center gap-2 text-sm opacity-90">
-              <Wallet size={18} aria-hidden /> ยอดคงเหลือรวม
-            </span>
-            <span className="rounded-full bg-white/18 px-3 py-1 text-xs">{data.wallets.length} กระเป๋า</span>
+          <div className="pointer-events-none absolute -top-16 -right-10 h-56 w-56 rounded-full border-[18px] border-white/12" aria-hidden />
+          <div className="pointer-events-none absolute -right-2 -bottom-20 h-44 w-44 rounded-full bg-white/10" aria-hidden />
+          <div className="relative flex h-full flex-col">
+            <div className="flex items-center justify-between gap-3">
+              <span className="inline-flex items-center gap-2 text-sm opacity-90">
+                <Wallet size={18} aria-hidden /> ยอดคงเหลือรวม
+              </span>
+              <span className="text-xs opacity-80">{data.wallets.length} กระเป๋า</span>
+            </div>
+            <div className="num mt-6 text-4xl font-semibold tracking-tight break-words sm:text-[2.75rem]">{formatBaht(data.total)}</div>
+            <div className="mt-auto flex items-end justify-between gap-3 pt-8">
+              <span className="text-xs opacity-75">ทุกกระเป๋ารวมกัน</span>
+              <button
+                type="button"
+                onClick={() => onNavigate('wallets')}
+                className="inline-flex min-h-9 items-center gap-1 rounded-full bg-brand px-3.5 text-sm font-medium text-on-brand"
+              >
+                กระเป๋า <ChevronRight size={15} aria-hidden />
+              </button>
+            </div>
           </div>
-          <div className="num mt-5 text-4xl font-semibold tracking-tight break-words sm:text-[2.75rem]">{formatBaht(data.total)}</div>
-
-          <ul className="mt-6 space-y-2">
-            {data.wallets.map((w) => {
-              const bal = data.balances.get(w.id) ?? 0
-              return (
-                <li key={w.id} className="flex items-center gap-2.5 rounded-2xl bg-white/14 px-3 py-2.5">
-                  <WalletIcon wallet={w} size="sm" />
-                  <span className="min-w-0 flex-1 truncate text-sm">{w.name}</span>
-                  <span className={`num shrink-0 text-sm font-semibold ${bal < 0 ? 'text-sun' : ''}`}>{formatBaht(bal)}</span>
-                </li>
-              )
-            })}
-          </ul>
-          <button
-            type="button"
-            onClick={() => onNavigate('wallets')}
-            className="mt-4 inline-flex min-h-9 items-center gap-1 rounded-full bg-white/18 px-3.5 text-sm font-medium hover:bg-white/25"
-          >
-            จัดการกระเป๋า <ChevronRight size={15} aria-hidden />
-          </button>
         </section>
 
         <MonthCard data={data} onNavigate={onNavigate} />
 
-        <QuickAdds data={data} onOpen={onOpen} />
+        {/* รายชื่อกระเป๋า */}
+        <section className="card lg:col-span-5">
+          <CardHeader
+            title="กระเป๋า"
+            action={
+              <button className="-mr-2 inline-flex items-center gap-0.5 rounded-lg px-2 py-1 text-sm font-medium text-ink-2 hover:bg-sunken" onClick={() => onNavigate('wallets')}>
+                จัดการ <ChevronRight size={16} aria-hidden />
+              </button>
+            }
+          />
+          <ul className="divide-y divide-line/70 border-t border-line/70">
+            {data.wallets.map((w) => {
+              const bal = data.balances.get(w.id) ?? 0
+              return (
+                <li key={w.id} className="flex items-center gap-3 px-5 py-3">
+                  <WalletIcon wallet={w} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium">{w.name}</span>
+                    <span className="block text-xs text-muted">{WALLET_TYPES[w.type].label}</span>
+                  </span>
+                  <span className={`num shrink-0 font-semibold ${bal < 0 ? 'text-expense' : ''}`}>{formatBaht(bal)}</span>
+                </li>
+              )
+            })}
+          </ul>
+        </section>
 
         <TopCategories data={data} onNavigate={onNavigate} />
 
+        <QuickAdds data={data} onOpen={onOpen} />
+
         {/* รายการล่าสุด */}
-        <section className="card overflow-hidden lg:col-span-7">
+        <section className="card overflow-hidden lg:col-span-12">
           <CardHeader
             title="รายการล่าสุด"
             action={
