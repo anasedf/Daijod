@@ -1,0 +1,41 @@
+// จำนวนเงินทั้งหมดเก็บเป็น "สตางค์" (จำนวนเต็ม) เพื่อเลี่ยงปัญหาทศนิยมของ JavaScript
+// เช่น 125.50 บาท = 12550
+
+export type WalletType = 'cash' | 'bank' | 'ewallet' | 'other'
+
+export interface Wallet {
+  id: string
+  name: string
+  type: WalletType
+  openingBalance: number // สตางค์
+  color: string
+  createdAt: number
+  updatedAt: number
+}
+
+export type TransactionType = 'income' | 'expense' | 'transfer'
+
+export interface Transaction {
+  id: string
+  type: TransactionType
+  amount: number // สตางค์ ต้องมากกว่า 0
+  date: string // YYYY-MM-DD (วันที่ตามเวลาท้องถิ่น)
+  categoryId?: string // ไม่ใช้กับการโอน
+  note: string
+  sourceWalletId?: string // รายจ่าย และ โอน
+  destinationWalletId?: string // รายรับ และ โอน
+  createdAt: number
+  updatedAt: number
+}
+
+export type CategoryType = 'income' | 'expense'
+
+export interface Category {
+  id: string
+  name: string
+  type: CategoryType
+  icon: string
+}
+
+export type TransactionInput = Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>
+export type WalletInput = Omit<Wallet, 'id' | 'createdAt' | 'updatedAt'>
