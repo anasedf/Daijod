@@ -116,6 +116,9 @@ export function TransactionForm({
       categoryId: categoryId || undefined,
       sourceWalletId: source,
       destinationWalletId: dest,
+      // คงข้อมูลนำเข้าไว้ ไม่งั้นแก้ไขแล้วรายการจะถูกนำเข้าซ้ำได้
+      importKey: transaction?.importKey,
+      importDetail: transaction?.importDetail,
     }
     try {
       if (transaction) await updateTransaction(transaction.id, input)
@@ -288,7 +291,7 @@ export function TransactionForm({
                 </>
               ) : (
                 <>
-                  รายละเอียด <span className="font-normal text-muted">(ไม่บังคับ)</span>
+                  ชื่อรายการ <span className="font-normal text-muted">(ร้าน/สิ่งที่จ่าย ไม่บังคับ)</span>
                 </>
               )}
             </label>
@@ -318,6 +321,13 @@ export function TransactionForm({
             rows={3}
           />
         </div>
+
+        {transaction?.importDetail && (
+          <div className="rounded-xl bg-sunken px-3 py-2.5 text-xs">
+            <div className="mb-0.5 font-medium text-ink-2">ข้อมูลจาก statement</div>
+            <div className="break-words text-muted">{transaction.importDetail}</div>
+          </div>
+        )}
 
         {error && <FormError>{error}</FormError>}
 

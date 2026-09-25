@@ -60,7 +60,13 @@ function buildRows(statement: Statement, data: AppData, walletId: string): Row[]
 
 function toInput(row: Row, walletId: string): TransactionInput {
   const { tx, choice } = row
-  const base = { amount: tx.amount, date: tx.date, note: row.name, importKey: tx.key }
+  const base = {
+    amount: tx.amount,
+    date: tx.date,
+    note: row.name,
+    importKey: tx.key,
+    importDetail: [tx.kind, tx.channel, tx.time, tx.detail].filter(Boolean).join(' · '),
+  }
   if (choice.type === 'transfer') {
     return tx.direction === 'in'
       ? { ...base, type: 'transfer', sourceWalletId: choice.walletId, destinationWalletId: walletId }

@@ -11,6 +11,12 @@ describe('memo', () => {
     expect('memo' in normalizeTransaction({ ...base })).toBe(false)
   })
 
+  it('คงข้อมูลนำเข้าไว้เมื่อแก้ไข', () => {
+    const n = normalizeTransaction({ ...base, importKey: 'k', importDetail: 'ชำระเงิน · K PLUS · 07:07 · ร้านกาแฟ' })
+    expect(n.importKey).toBe('k')
+    expect(n.importDetail).toBe('ชำระเงิน · K PLUS · 07:07 · ร้านกาแฟ')
+  })
+
   it('ค้นหาเจอจากโน้ต', () => {
     const tx: Transaction = { ...base, id: 't1', memo: 'เลี้ยงวันเกิดพี่โอ๋', createdAt: 1, updatedAt: 1 }
     expect(filterTransactions([tx], { search: 'วันเกิด' }, new Map(), new Map())).toHaveLength(1)

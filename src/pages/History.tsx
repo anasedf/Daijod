@@ -117,7 +117,7 @@ export function HistoryPage({ data, onOpen }: { data: AppData; onOpen: (t: Trans
               <input
                 type="search"
                 className="field pl-10"
-                placeholder="ค้นหารายละเอียด หมวด หรือกระเป๋า"
+                placeholder="ค้นหาชื่อ โน้ต หมวด หรือกระเป๋า"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 aria-label="ค้นหา"
