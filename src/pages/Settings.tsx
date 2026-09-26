@@ -362,11 +362,11 @@ function AppearanceSection() {
 }
 
 /** หน้าตั้งค่าแบบ iOS: ทุกหัวข้อเปิดรายละเอียดแบบเดียวกัน (มือถือ = หน้าย่อย, จอใหญ่ = แผงขวา) */
-export function SettingsPage({ data }: { data: AppData }) {
+export function SettingsPage({ data, initialSection }: { data: AppData; initialSection?: Section }) {
   const toast = useToast()
   const confirm = useConfirm()
   const fileInput = useRef<HTMLInputElement>(null)
-  const [section, setSection] = useState<Section | null>(null)
+  const [section, setSection] = useState<Section | null>(initialSection ?? null)
   const [editing, setEditing] = useState<{ type: CategoryType; category?: Category } | null>(null)
   const [deleting, setDeleting] = useState<Category | null>(null)
   const [importing, setImporting] = useState(false)
@@ -458,7 +458,10 @@ export function SettingsPage({ data }: { data: AppData }) {
 
   const content =
     active === 'wallets' ? (
-      <WalletsPage data={data} embedded />
+      // ห่อไว้ชั้นหนึ่ง ไม่ให้การ์ดกระเป๋าโดนกฎ "การ์ดชั้นในเรียบ" ของแผงตั้งค่า
+      <div className="pt-6">
+        <WalletsPage data={data} embedded />
+      </div>
     ) : active === 'categories' ? (
       <div className="space-y-4">
         {(['expense', 'income'] as CategoryType[]).map((type) => {
@@ -622,13 +625,33 @@ export function SettingsPage({ data }: { data: AppData }) {
         )}
       </div>
 
-      {/* จอใหญ่: เมนูซ้าย รายละเอียดขวา */}
+      {/* จอใหญ่: แผ่นเดียว เมนูคอลัมน์ซ้ายมีเส้นคั่น เนื้อหาเรียบทางขวา */}
       <div className="hidden lg:block">
         <PageHeader title="ตั้งค่า" />
-        <div className="grid grid-cols-[17rem_minmax(0,1fr)] items-start gap-6">
-          <div className="sticky top-8">{menu}</div>
-          <div>
+        <div className="card grid min-h-[36rem] grid-cols-[16rem_minmax(0,1fr)] overflow-hidden">
+          <nav className="border-r border-line py-3" aria-label="หัวข้อตั้งค่า">
+            <ul>
+              {SECTIONS.map((s) => (
+                <li key={s.id}>
+                  <button
+                    type="button"
+                    onClick={() => setSection(s.id)}
+                    aria-current={s.id === active ? 'true' : undefined}
+                    className={`relative flex w-full items-center gap-3 px-5 py-2.5 text-left text-sm transition-colors hover:bg-sunken ${
+                      s.id === active ? 'bg-sunken font-medium text-ink' : 'text-ink-2'
+                    }`}
+                  >
+                    {s.id === active && <span className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-accent" aria-hidden />}
+                    <s.Icon size={17} className={s.id === active ? 'text-accent-strong' : 'text-muted'} aria-hidden />
+                    {s.label}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </nav>
+          <div className="settings-panel px-8 py-6">
             {detailHeader}
+            <div className="border-t border-line" />
             {content}
           </div>
         </div>

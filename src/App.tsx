@@ -1,4 +1,4 @@
-import { ChartPie, House, MonitorSmartphone, Moon, Plus, ReceiptText, Settings, Sun, Wallet, type LucideIcon } from 'lucide-react'
+import { ChartPie, House, MonitorSmartphone, Moon, Plus, ReceiptText, Settings, Sun, type LucideIcon } from 'lucide-react'
 import { Component, useCallback, useEffect, useState, type ReactNode } from 'react'
 import { TransactionForm } from './components/TransactionForm'
 import { UIProvider } from './components/ui'
@@ -11,7 +11,6 @@ import { DashboardPage } from './pages/Dashboard'
 import { HistoryPage } from './pages/History'
 import { SettingsPage } from './pages/Settings'
 import { StatsPage } from './pages/Stats'
-import { WalletsPage } from './pages/Wallets'
 
 export type Tab = 'home' | 'history' | 'stats' | 'wallets' | 'settings'
 
@@ -19,11 +18,10 @@ const TABS: { id: Tab; label: string; Icon: LucideIcon }[] = [
   { id: 'home', label: 'ภาพรวม', Icon: House },
   { id: 'history', label: 'รายการ', Icon: ReceiptText },
   { id: 'stats', label: 'สถิติ', Icon: ChartPie },
-  { id: 'wallets', label: 'กระเป๋า', Icon: Wallet },
   { id: 'settings', label: 'ตั้งค่า', Icon: Settings },
 ]
-// มือถือมีที่ 4 แท็บ + ปุ่มจด: กระเป๋าเข้าได้จากการ์ดยอดรวมและหน้าตั้งค่า
-const MOBILE_TABS = TABS.filter((t) => t.id !== 'wallets')
+// แท็บ 'wallets' คือทางลัดไปตั้งค่า → กระเป๋า (หน้าเดียวกัน ไม่แยกหน้า)
+const MOBILE_TABS = TABS
 
 type Editor = { kind: 'tx'; tx?: Transaction } | { kind: 'wallet' } | null
 
@@ -87,6 +85,7 @@ function Shell() {
   }, [editor, addNew])
 
   const addLabel = data?.wallets.length === 0 ? 'เพิ่มกระเป๋า' : 'จดรายการ'
+  const navTab: Tab = tab === 'wallets' ? 'settings' : tab
 
   return (
     <div className="min-h-dvh lg:flex">
@@ -112,12 +111,12 @@ function Shell() {
                 <button
                   type="button"
                   onClick={() => setTab(id)}
-                  aria-current={tab === id ? 'page' : undefined}
+                  aria-current={navTab === id ? 'page' : undefined}
                   className={`flex w-full items-center gap-3 rounded-full px-4 py-3 text-[0.95rem] font-medium transition-colors ${
-                    tab === id ? 'bg-brand text-on-brand' : 'text-ink-2 hover:bg-sunken hover:text-ink'
+                    navTab === id ? 'bg-brand text-on-brand' : 'text-ink-2 hover:bg-sunken hover:text-ink'
                   }`}
                 >
-                  <Icon size={20} strokeWidth={tab === id ? 2.4 : 2} aria-hidden />
+                  <Icon size={20} strokeWidth={navTab === id ? 2.4 : 2} aria-hidden />
                   {label}
                 </button>
               </li>
@@ -154,10 +153,8 @@ function Shell() {
           <HistoryPage data={data} onOpen={openTx} />
         ) : tab === 'stats' ? (
           <StatsPage data={data} onNavigate={setTab} />
-        ) : tab === 'wallets' ? (
-          <WalletsPage data={data} />
         ) : (
-          <SettingsPage data={data} />
+          <SettingsPage key={tab} data={data} initialSection={tab === 'wallets' ? 'wallets' : undefined} />
         )}
       </main>
 
@@ -186,18 +183,18 @@ function Shell() {
                 <button
                   type="button"
                   onClick={() => setTab(t.id)}
-                  aria-current={tab === t.id ? 'page' : undefined}
+                  aria-current={navTab === t.id ? 'page' : undefined}
                   className={`flex h-[4.25rem] w-full flex-col items-center justify-center gap-1 text-[0.68rem] font-medium ${
-                    tab === t.id ? 'text-ink' : 'text-muted'
+                    navTab === t.id ? 'text-ink' : 'text-muted'
                   }`}
                 >
                   <span
                     className={`flex h-7 w-11 items-center justify-center rounded-full transition-colors ${
-                      tab === t.id ? 'bg-accent-soft text-accent-strong' : ''
+                      navTab === t.id ? 'bg-accent-soft text-accent-strong' : ''
                     }`}
                     aria-hidden
                   >
-                    <t.Icon size={21} strokeWidth={tab === t.id ? 2.2 : 1.9} />
+                    <t.Icon size={21} strokeWidth={navTab === t.id ? 2.2 : 1.9} />
                   </span>
                   {t.label}
                 </button>
